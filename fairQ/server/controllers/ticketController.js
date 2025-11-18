@@ -1,5 +1,6 @@
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
+import { reorderTickets } from "../utils/reorderQueue.js";
 export const requiredDocsList = {
   Hospital: ["Aadhar Card", "Doctor Prescription", "Medical Report"],
   Bank: ["Aadhar Card", "PAN Card", "Passbook Copy"],
@@ -74,7 +75,11 @@ export const bookTicket = async (req, res) => {
       organization,
       serviceType,
       purpose,
-      priority: isEmergency ? 'Emergency' : priority || 'Normal',
+      priority: {
+      emergency: isEmergency === true,
+      elderly: priority === "Elderly",
+      prepared: false // becomes true only after PIT scan
+      },
       isEmergency,
       queuePosition,
       estimatedWaitTime
@@ -327,6 +332,20 @@ export const uploadDocuments = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const getSortedQueue = async (req, res) => {
+    const { serviceType } = req.params;
+
+    const tickets = await Ticket.find({
+        serviceType,
+        status: { $in: ["Pending", "Processing"] }
+    }).lean();
+
+    const sorted = reorderTickets(tickets);
+
+    res.json({ success: true, tickets: sorted });
+};
+
 
 // Get ticket statistics
 export const getTicketStats = async (req, res) => {

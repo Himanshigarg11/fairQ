@@ -11,6 +11,7 @@ import {
   uploadDocuments   // this must match the name exported from controller
 } from '../controllers/ticketController.js';
 import { authenticate, authorize } from '../middleware/authMiddleware.js';
+import { getSortedQueue } from "../controllers/ticketController.js";
 
 const router = express.Router();
 
@@ -35,5 +36,7 @@ router.get('/:ticketId', authenticate, getTicketById);
 router.get('/', authenticate, authorize('Staff', 'Admin'), getAllTickets);
 router.put('/:ticketId/status', authenticate, authorize('Staff', 'Admin'), updateTicketStatus);
 router.get('/admin/stats', authenticate, authorize('Admin'), getTicketStats);
+
+router.get("/queue/:serviceType/sorted", authenticate, authorize("Staff", "Admin"), getSortedQueue);
 
 export default router;

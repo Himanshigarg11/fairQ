@@ -66,10 +66,10 @@ const ticketSchema = new mongoose.Schema({
     maxlength: 500
   },
   priority: {
-    type: String,
-    enum: ['Normal', 'Emergency', 'Elderly', 'Disabled'],
-    default: 'Normal'
-  },
+  emergency: { type: Boolean, default: false },
+  elderly: { type: Boolean, default: false },
+  prepared: { type: Boolean, default: false }
+},
   isEmergency: {
     type: Boolean,
     default: false
