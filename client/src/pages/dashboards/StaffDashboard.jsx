@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
-  getAllTickets,
+  getSortedQueue,
   updateTicketStatus,
 } from "../../services/ticketService";
 
@@ -16,17 +16,25 @@ const StaffDashboard = () => {
   const [success, setSuccess] = useState(""); // Add success message state
 
   const fetchTickets = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await getAllTickets({ status: filter });
-      setTickets(response.data.tickets);
-      setError(""); // Clear any previous errors
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+  try {
+    setLoading(true);
+
+    // Choose the serviceType your tickets are booked under
+    const serviceType = "General Checkup"; 
+    // OR whatever actual serviceType your users select
+    // You can make this dynamic later
+
+    const response = await getSortedQueue(serviceType);
+
+    setTickets(response.tickets);
+    setError("");
+  } catch (error) {
+    setError(error.message);
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
 
   useEffect(() => {
     fetchTickets();
@@ -93,21 +101,27 @@ const StaffDashboard = () => {
     }
   };
 
-  const getPriorityBadge = (priority) => {
-    switch (priority) {
-      case "Emergency":
-        return {
-          label: "EMERGENCY",
-          color: "bg-red-500 text-white animate-pulse",
-        };
-      case "Elderly":
-        return { label: "ELDERLY", color: "bg-purple-500 text-white" };
-      case "Disabled":
-        return { label: "SPECIAL NEEDS", color: "bg-indigo-500 text-white" };
-      default:
-        return { label: "NORMAL", color: "bg-gray-500 text-white" };
-    }
-  };
+  // FIXED: Now works with priority object from backend
+const getPriorityBadge = (priorityObj) => {
+  if (!priorityObj) {
+    return { label: "NORMAL", color: "bg-gray-500 text-white" };
+  }
+
+  if (priorityObj.emergency) {
+    return { label: "EMERGENCY", color: "bg-red-600 text-white animate-pulse" };
+  }
+
+  if (priorityObj.elderly) {
+    return { label: "ELDERLY", color: "bg-purple-600 text-white" };
+  }
+
+  if (priorityObj.prepared) {
+    return { label: "PREPARED", color: "bg-blue-600 text-white" };
+  }
+
+  return { label: "NORMAL", color: "bg-gray-500 text-white" };
+};
+
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {

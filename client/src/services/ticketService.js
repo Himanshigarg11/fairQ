@@ -58,3 +58,12 @@ export const getTicketStats = async () => {
     throw new Error(error.response?.data?.message || 'Failed to get ticket statistics');
   }
 };
+
+export const getSortedQueue = async (serviceType) => {
+  try {
+    const response = await api.get(`/tickets/queue/${serviceType}/sorted`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to get sorted queue');
+  }
+};
