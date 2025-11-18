@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/api";
 import { generatePIT } from "../services/pitService.js";
-
+import { getMyTickets } from "../services/ticketService";
 export default function GeneratePIT() {
   const { user } = useAuth();
   const [tickets, setTickets] = useState([]);
@@ -18,23 +18,53 @@ export default function GeneratePIT() {
   const [generating, setGenerating] = useState(false);
 
   // Fetch user tickets on mount
-  useEffect(() => {
-    const loadTickets = async () => {
-      setLoadingTickets(true);
-      try {
-        const res = await api.get("/tickets/my-tickets");
-        const list = res.data?.tickets || [];
-        console.log("DEBUG tickets:", list);
-        setTickets(list);
-      } catch (err) {
-        console.error("Ticket fetch error:", err);
-        setMessage("Could not load tickets. Try refreshing.");
-      } finally {
-        setLoadingTickets(false);
+useEffect(() => {
+  const loadTickets = async () => {
+    setLoadingTickets(true);
+    try {
+      const res = await getMyTickets("Pending");
+
+      console.log("RAW response:", res);
+
+      let list = [];
+
+      // Backend format: { success, data: { tickets: [...] } }
+      if (Array.isArray(res?.data?.tickets)) {
+        list = res.data.tickets;
+
+      // Backend format: { tickets: [...] }
+      } else if (Array.isArray(res?.tickets)) {
+        list = res.tickets;
+
+      // Backend format: { data: [...] }
+      } else if (Array.isArray(res?.data)) {
+        list = res.data;
+
+      // Backend returns array directly
+      } else if (Array.isArray(res)) {
+        list = res;
+
+      } else {
+        console.log("❌ No ticket array found in response");
       }
-    };
-    loadTickets();
-  }, []);
+
+      console.log("FINAL TICKET LIST:", list);
+
+      setTickets(list);
+    } catch (err) {
+      console.error("Ticket fetch error:", err);
+      setMessage("Could not load tickets. Try refreshing.");
+      setTickets([]);
+    } finally {
+      setLoadingTickets(false);
+    }
+  };
+
+  loadTickets();
+}, []);
+
+
+
 
   const handleChecklistChange = (e) => {
     setChecklist({ ...checklist, [e.target.name]: e.target.checked });
