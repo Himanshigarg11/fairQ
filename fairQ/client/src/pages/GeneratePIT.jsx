@@ -3,6 +3,14 @@ import { useAuth } from "../context/AuthContext";
 import api from "../api/api";
 import { generatePIT } from "../services/pitService.js";
 import { getMyTickets } from "../services/ticketService";
+// Required documents list
+const requiredDocs = [
+  "Aadhar Card",
+  "Appointment Confirmation PDF",
+  "Service Request Form",
+  "Any supporting documents"
+];
+
 export default function GeneratePIT() {
   const { user } = useAuth();
   const [tickets, setTickets] = useState([]);
@@ -163,23 +171,44 @@ useEffect(() => {
         )}
 
         {/* Checklist */}
-        <h2 className="text-lg font-semibold mb-3">Checklist</h2>
-        <div className="space-y-3 mb-5">
-          <label className="flex items-center space-x-3">
-            <input type="checkbox" name="idProof" checked={checklist.idProof} onChange={handleChecklistChange} />
-            <span>I have valid ID proof</span>
-          </label>
+      <h2 className="text-lg font-semibold mb-3">Checklist</h2>
 
-          <label className="flex items-center space-x-3">
-            <input type="checkbox" name="documentsReady" checked={checklist.documentsReady} onChange={handleChecklistChange} />
-            <span>I have all required documents</span>
-          </label>
+{/* REQUIRED DOCUMENTS LIST */}
+<div className="mb-5 bg-gray-50 p-4 rounded border">
+  <h3 className="text-md font-semibold mb-2">Required Documents</h3>
 
-          <label className="flex items-center space-x-3">
-            <input type="checkbox" name="appointmentConfirmed" checked={checklist.appointmentConfirmed} onChange={handleChecklistChange} />
-            <span>My appointment is confirmed</span>
-          </label>
-        </div>
+  <ul className="list-disc pl-6 text-gray-700">
+    {requiredDocs.map((doc, index) => (
+      <li key={index}>{doc}</li>
+    ))}
+  </ul>
+</div>
+
+{/* CHECKLIST BOXES */}
+const requiredDocs = [
+  "Aadhar Card",
+  "Appointment Confirmation PDF",
+  "Service Request Form",
+  "Any supporting documents"
+];
+
+<div className="space-y-3 mb-5">
+  <label className="flex items-center space-x-3">
+    <input type="checkbox" name="idProof" checked={checklist.idProof} onChange={handleChecklistChange} />
+    <span>I have valid ID proof</span>
+  </label>
+
+  <label className="flex items-center space-x-3">
+    <input type="checkbox" name="documentsReady" checked={checklist.documentsReady} onChange={handleChecklistChange} />
+    <span>I have uploaded all required documents</span>
+  </label>
+
+  <label className="flex items-center space-x-3">
+    <input type="checkbox" name="appointmentConfirmed" checked={checklist.appointmentConfirmed} onChange={handleChecklistChange} />
+    <span>My appointment is confirmed</span>
+  </label>
+</div>
+
 
         {/* Action row */}
         <div className="flex items-center space-x-4">

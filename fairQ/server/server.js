@@ -32,6 +32,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'Health c
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use("/api/pit", pitRoutes); // <-- FIXED: moved AFTER app is created
+app.use("/uploads", express.static("uploads"));
 
 // 404 Handler
 app.use((req, res) => 

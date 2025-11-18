@@ -1,4 +1,43 @@
 import mongoose from 'mongoose';
+export const REQUIRED_DOCS_BY_ORG = {
+  Hospital: [
+    "Aadhar Card",
+    "Appointment Confirmation PDF",
+    "Medical Reference Letter"
+  ],
+  Bank: [
+    "Aadhar Card",
+    "Account Statement",
+    "Service Request Form"
+  ],
+  "Government Office": [
+    "Aadhar Card",
+    "Appointment Slip",
+    "Application Form",
+    "Supporting Documents"
+  ],
+  Airport: [
+    "Aadhar Card",
+    "Flight Booking Confirmation",
+    "Service Request Form"
+  ],
+  Restaurant: [
+    "Aadhar Card"
+  ],
+  DMV: [
+    "Aadhar Card",
+    "Driving License Application",
+    "Appointment Confirmation"
+  ],
+  "Post Office": [
+    "Aadhar Card",
+    "Mail/Parcel Documents"
+  ],
+  "Telecom Office": [
+    "Aadhar Card",
+    "SIM Request Form"
+  ]
+};
 
 const ticketSchema = new mongoose.Schema({
   
@@ -69,6 +108,19 @@ const ticketSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  requiredDocuments: {
+  type: [String],
+  default: []
+},
+
+documents: [
+  {
+    fileName: String,
+    fileUrl: String,
+    uploadedAt: { type: Date, default: Date.now }
+  }
+],
+
 
   // ⭐ PIT fields
   pit: {

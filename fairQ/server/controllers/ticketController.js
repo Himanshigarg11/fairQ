@@ -1,5 +1,15 @@
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
+export const requiredDocsList = {
+  Hospital: ["Aadhar Card", "Doctor Prescription", "Medical Report"],
+  Bank: ["Aadhar Card", "PAN Card", "Passbook Copy"],
+  "Government Office": ["Aadhar Card", "Application Form", "Passport Photo"],
+  "Post Office": ["ID Proof", "Application Slip"],
+  "Telecom Office": ["Aadhar Card", "Old SIM", "Passport Photo"],
+  "Airport": ["Ticket Copy", "ID Proof"],
+  "Restaurant": ["Reservation ID (optional)"],
+  DMV: ["Driving License Form", "2 Photos", "ID Proof"]
+};
 
 // Helper function to generate unique ticket number
 const generateTicketNumber = async (organization) => {
@@ -256,6 +266,65 @@ export const getTicketById = async (req, res) => {
       success: false,
       message: error.message || 'Failed to get ticket'
     });
+  }
+};
+// Get pending tickets for PIT
+export const getPendingTicketsForPIT = async (req, res) => {
+  try {
+    const customerId = req.user._id;
+
+    const tickets = await Ticket.find({
+      customer: customerId,
+      status: "Pending",
+      "pit.generated": false
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: tickets
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+//upload documents
+
+export const uploadDocuments = async (req, res) => {
+  try {
+    const ticketId = req.params.ticketId;
+    const userId = req.user._id;
+
+    const ticket = await Ticket.findById(ticketId);
+
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: "Ticket not found" });
+    }
+
+    if (ticket.customer.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "Not your ticket" });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No files uploaded" });
+    }
+
+    const uploadedDocs = req.files.map(file => ({
+      fileName: file.originalname,
+      fileUrl: `/uploads/${file.filename}`,
+      uploadedAt: new Date()
+    }));
+
+    ticket.documents.push(...uploadedDocs);
+    await ticket.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Documents uploaded successfully",
+      data: ticket.documents
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
