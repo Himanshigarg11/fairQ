@@ -138,6 +138,24 @@ documents: [
 }, {
   timestamps: true
 });
+// Auto-fill requiredDocuments based on organization if not set.
+// Place this BEFORE the ticketSchema.pre('save', ...) block.
+ticketSchema.pre("validate", function (next) {
+  try {
+    // Only set if array is empty / not provided (so we don't overwrite manual values)
+    if ((!this.requiredDocuments || this.requiredDocuments.length === 0) && this.organization) {
+      const org = this.organization;
+      if (REQUIRED_DOCS_BY_ORG[org]) {
+        this.requiredDocuments = REQUIRED_DOCS_BY_ORG[org].slice(); // copy array
+      } else {
+        this.requiredDocuments = []; // fallback
+      }
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Generate unique ticket number before saving
 ticketSchema.pre('save', async function(next) {

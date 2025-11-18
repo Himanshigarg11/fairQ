@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
+import uploadDocsRoutes from "./routes/uploadDocument.js";
 
 import authRoutes from './routes/auth.js';
 import ticketRoutes from './routes/tickets.js';
@@ -23,7 +24,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
-
+app.use("/uploads", express.static("uploads")); 
 // Default routes
 app.get('/', (req, res) => res.json({ message: 'FairQ API running', status: 'OK' }));
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'Health check passed' }));
@@ -33,7 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use("/api/pit", pitRoutes); // <-- FIXED: moved AFTER app is created
 app.use("/uploads", express.static("uploads"));
-
+app.use("/api/documents", uploadDocsRoutes);
 // 404 Handler
 app.use((req, res) => 
   res.status(404).json({
