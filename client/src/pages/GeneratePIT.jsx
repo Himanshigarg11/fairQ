@@ -24,10 +24,23 @@ export default function GeneratePIT() {
         const all = res.data.data.tickets || [];
         setTickets(all);
 
-        // auto-select first ticket
-        if (all.length > 0) {
-          handleTicketSelect(all[0]._id);
-        }
+// ✅ Auto-select FIRST ticket safely
+if (all.length > 0) {
+  const first = all[0];
+
+  setSelectedTicketId(first._id);
+  setTicket(first);
+  setRequiredDocs(first.requiredDocuments || []);
+
+  const uploaded = {};
+  first.documents.forEach((doc) => {
+    uploaded[doc.fileName] = true;
+  });
+  setUploadedDocs(uploaded);
+
+  setChecklist({});
+}
+
       } catch (err) {
         console.log(err);
       }
@@ -39,7 +52,9 @@ export default function GeneratePIT() {
   const handleTicketSelect = (id) => {
     setSelectedTicketId(id);
 
-    const t = tickets.find((x) => x._id === id);
+   const t = tickets.find((x) => x._id === id);
+   if (!t) return;
+
     setTicket(t);
 
     // load required docs
