@@ -31,6 +31,12 @@ const AdminDashboard = () => {
   const [avgTime, setAvgTime] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const loadAnalytics = async () => {
@@ -142,7 +148,7 @@ const AdminDashboard = () => {
             <div className="rounded-xl bg-slate-800/80 border border-slate-700 px-4 py-2 text-xs text-slate-300">
               Last updated:{" "}
               <span className="font-mono">
-                {new Date().toLocaleTimeString()}
+                {currentTime.toLocaleTimeString()}
               </span>
             </div>
           </div>
