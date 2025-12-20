@@ -7,6 +7,7 @@ import uploadDocsRoutes from "./routes/uploadDocument.js";
 import authRoutes from './routes/auth.js';
 import ticketRoutes from './routes/tickets.js';
 import pitRoutes from "./routes/pit.js";  // <-- moved here (AFTER imports)
+import adminAnalyticsRoutes from "./routes/adminAnalytics.js";
 
 // Load environment variables
 dotenv.config();
@@ -36,6 +37,8 @@ app.use('/api/tickets', ticketRoutes);
 app.use("/api/pit", pitRoutes); // <-- FIXED: moved AFTER app is created
 app.use("/uploads", express.static("uploads"));
 app.use("/api/documents", uploadDocsRoutes);
+app.use("/api/admin/analytics", adminAnalyticsRoutes);
+
 // 404 Handler
 app.use((req, res) => 
   res.status(404).json({

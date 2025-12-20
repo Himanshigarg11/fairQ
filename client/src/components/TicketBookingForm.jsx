@@ -1,70 +1,159 @@
-import React, { useState } from 'react';
-import { bookTicket } from '../services/ticketService';
+import React, { useState } from "react";
+import { bookTicket } from "../services/ticketService";
+import { TicketIcon, AlertTriangle, Loader2 } from "lucide-react";
 
 const TicketBookingForm = ({ onTicketBooked }) => {
   const [formData, setFormData] = useState({
-    organization: '',
-    serviceType: '',
-    purpose: '',
-    priority: 'Normal',
-    isEmergency: false
+    organization: "",
+    serviceType: "",
+    purpose: "",
+    priority: "Normal",
+    isEmergency: false,
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const organizations = [
-    { value: 'Hospital', label: 'Hospital', services: ['General Checkup', 'Emergency', 'Specialist Consultation', 'Laboratory Tests', 'Pharmacy'] },
-    { value: 'Bank', label: 'Bank', services: ['Account Opening', 'Loan Application', 'Cash Withdrawal/Deposit', 'Investment Consultation', 'Customer Support'] },
-    { value: 'Government Office', label: 'Government Office', services: ['License Application', 'Certificate Request', 'Tax Filing', 'Permit Application', 'General Inquiry'] },
-    { value: 'Restaurant', label: 'Restaurant', services: ['Dine-in', 'Takeaway Order', 'Catering Booking', 'Event Booking'] },
-    { value: 'Airport', label: 'Airport', services: ['Check-in', 'Security Check', 'Immigration', 'Baggage Claim', 'Customer Service'] },
-    { value: 'DMV', label: 'DMV', services: ['License Renewal', 'Vehicle Registration', 'Road Test', 'ID Card', 'Address Change'] },
-    { value: 'Post Office', label: 'Post Office', services: ['Mail Delivery', 'Package Pickup', 'Money Order', 'Passport Application', 'P.O. Box Service'] },
-    { value: 'Telecom Office', label: 'Telecom Office', services: ['New Connection', 'Bill Payment', 'Technical Support', 'Plan Change', 'Device Repair'] }
+    {
+      value: "Hospital",
+      label: "Hospital",
+      services: [
+        "General Checkup",
+        "Emergency",
+        "Specialist Consultation",
+        "Laboratory Tests",
+        "Pharmacy",
+      ],
+    },
+    {
+      value: "Bank",
+      label: "Bank",
+      services: [
+        "Account Opening",
+        "Loan Application",
+        "Cash Withdrawal/Deposit",
+        "Investment Consultation",
+        "Customer Support",
+      ],
+    },
+    {
+      value: "Government Office",
+      label: "Government Office",
+      services: [
+        "License Application",
+        "Certificate Request",
+        "Tax Filing",
+        "Permit Application",
+        "General Inquiry",
+      ],
+    },
+    {
+      value: "Restaurant",
+      label: "Restaurant",
+      services: [
+        "Dine-in",
+        "Takeaway Order",
+        "Catering Booking",
+        "Event Booking",
+      ],
+    },
+    {
+      value: "Airport",
+      label: "Airport",
+      services: [
+        "Check-in",
+        "Security Check",
+        "Immigration",
+        "Baggage Claim",
+        "Customer Service",
+      ],
+    },
+    {
+      value: "DMV",
+      label: "DMV",
+      services: [
+        "License Renewal",
+        "Vehicle Registration",
+        "Road Test",
+        "ID Card",
+        "Address Change",
+      ],
+    },
+    {
+      value: "Post Office",
+      label: "Post Office",
+      services: [
+        "Mail Delivery",
+        "Package Pickup",
+        "Money Order",
+        "Passport Application",
+        "P.O. Box Service",
+      ],
+    },
+    {
+      value: "Telecom Office",
+      label: "Telecom Office",
+      services: [
+        "New Connection",
+        "Bill Payment",
+        "Technical Support",
+        "Plan Change",
+        "Device Repair",
+      ],
+    },
   ];
 
-  const currentOrg = organizations.find(org => org.value === formData.organization);
+  const currentOrg = organizations.find(
+    (org) => org.value === formData.organization
+  );
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value
-    });
-    
-    if (name === 'organization') {
-      setFormData(prev => ({ ...prev, organization: value, serviceType: '' }));
-    }
-    
-    if (name === 'isEmergency') {
-      setFormData(prev => ({ 
-        ...prev, 
-        isEmergency: checked, 
-        priority: checked ? 'Emergency' : 'Normal' 
-      }));
-    }
 
-    setError('');
-    setSuccess('');
+    setFormData((prev) => {
+      let updated = {
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      };
+
+      if (name === "organization") {
+        updated = { ...updated, organization: value, serviceType: "" };
+      }
+
+      if (name === "isEmergency") {
+        updated = {
+          ...updated,
+          isEmergency: checked,
+          priority: checked ? "Emergency" : "Normal",
+        };
+      }
+
+      return updated;
+    });
+
+    setError("");
+    setSuccess("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const response = await bookTicket(formData);
-      setSuccess(`Ticket booked successfully! Ticket Number: ${response.data.ticket.ticketNumber}`);
+      setSuccess(
+        `Ticket booked successfully! Ticket Number: ${response.data.ticket.ticketNumber}`
+      );
       setFormData({
-        organization: '',
-        serviceType: '',
-        purpose: '',
-        priority: 'Normal',
-        isEmergency: false
+        organization: "",
+        serviceType: "",
+        purpose: "",
+        priority: "Normal",
+        isEmergency: false,
       });
-      
+
       if (onTicketBooked) {
         onTicketBooked(response.data.ticket);
       }
@@ -76,14 +165,30 @@ const TicketBookingForm = ({ onTicketBooked }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Book Queue Ticket</h2>
+    <div className="bg-white/95 rounded-2xl shadow-lg border border-slate-200 p-6 md:p-8 max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-rose-500 flex items-center justify-center text-white shadow-md">
+          <TicketIcon size={20} />
+        </div>
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">
+            Book Queue Ticket
+          </h2>
+          <p className="text-xs md:text-sm text-slate-500">
+            Choose an organization, select your service, and describe your visit.
+          </p>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Organization Selection */}
         <div>
-          <label htmlFor="organization" className="block text-sm font-medium text-gray-700 mb-2">
-            Select Organization *
+          <label
+            htmlFor="organization"
+            className="block text-sm font-semibold text-slate-700 mb-2"
+          >
+            Select Organization<span className="text-red-500"> *</span>
           </label>
           <select
             id="organization"
@@ -91,7 +196,7 @@ const TicketBookingForm = ({ onTicketBooked }) => {
             value={formData.organization}
             onChange={handleChange}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
           >
             <option value="">Choose an organization...</option>
             {organizations.map((org) => (
@@ -105,8 +210,11 @@ const TicketBookingForm = ({ onTicketBooked }) => {
         {/* Service Type Selection */}
         {formData.organization && (
           <div>
-            <label htmlFor="serviceType" className="block text-sm font-medium text-gray-700 mb-2">
-              Service Type *
+            <label
+              htmlFor="serviceType"
+              className="block text-sm font-semibold text-slate-700 mb-2"
+            >
+              Service Type<span className="text-red-500"> *</span>
             </label>
             <select
               id="serviceType"
@@ -114,7 +222,7 @@ const TicketBookingForm = ({ onTicketBooked }) => {
               value={formData.serviceType}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
             >
               <option value="">Choose a service...</option>
               {currentOrg?.services.map((service) => (
@@ -128,9 +236,17 @@ const TicketBookingForm = ({ onTicketBooked }) => {
 
         {/* Purpose */}
         <div>
-          <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 mb-2">
-            Purpose/Reason *
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label
+              htmlFor="purpose"
+              className="block text-sm font-semibold text-slate-700"
+            >
+              Purpose/Reason<span className="text-red-500"> *</span>
+            </label>
+            <span className="text-[11px] text-slate-400">
+              {formData.purpose.length}/500
+            </span>
+          </div>
           <textarea
             id="purpose"
             name="purpose"
@@ -139,34 +255,43 @@ const TicketBookingForm = ({ onTicketBooked }) => {
             required
             rows={3}
             maxLength={500}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-            placeholder="Please describe the purpose of your visit..."
+            className="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+            placeholder="Briefly describe why you are visiting..."
           />
-          <p className="mt-1 text-xs text-gray-500">{formData.purpose.length}/500 characters</p>
         </div>
 
         {/* Emergency Priority */}
-        <div className="flex items-center space-x-3 p-4 bg-red-50 rounded-lg border border-red-200">
+        <div className="flex items-start gap-3 p-4 bg-red-50 rounded-xl border border-red-200">
           <input
             type="checkbox"
             id="isEmergency"
             name="isEmergency"
             checked={formData.isEmergency}
             onChange={handleChange}
-            className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+            className="mt-1 w-4 h-4 text-red-600 border-slate-300 rounded focus:ring-red-500"
           />
           <div className="flex-1">
-            <label htmlFor="isEmergency" className="text-sm font-medium text-red-800">
+            <label
+              htmlFor="isEmergency"
+              className="text-sm font-semibold text-red-800 flex items-center gap-1"
+            >
+              <AlertTriangle size={14} />
               This is an Emergency
             </label>
-            <p className="text-xs text-red-600">Emergency cases will be prioritized in the queue</p>
+            <p className="text-xs text-red-600 mt-0.5">
+              Emergency cases are prioritized in the queue and may be processed
+              ahead of others.
+            </p>
           </div>
         </div>
 
         {/* Priority Selection (if not emergency) */}
         {!formData.isEmergency && (
           <div>
-            <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="priority"
+              className="block text-sm font-semibold text-slate-700 mb-2"
+            >
               Priority Level
             </label>
             <select
@@ -174,7 +299,7 @@ const TicketBookingForm = ({ onTicketBooked }) => {
               name="priority"
               value={formData.priority}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
             >
               <option value="Normal">Normal</option>
               <option value="Elderly">Elderly (65+)</option>
@@ -185,14 +310,14 @@ const TicketBookingForm = ({ onTicketBooked }) => {
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-700 font-medium">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 font-medium">
+            {error}
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-sm text-green-700 font-medium">{success}</p>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-700 font-medium">
+            {success}
           </div>
         )}
 
@@ -200,9 +325,10 @@ const TicketBookingForm = ({ onTicketBooked }) => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-orange-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 px-6 rounded-xl font-semibold shadow-md hover:from-orange-600 hover:to-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
         >
-          {loading ? 'Booking Ticket...' : 'Book Ticket'}
+          {loading && <Loader2 size={18} className="animate-spin" />}
+          {loading ? "Booking Ticket..." : "Book Ticket"}
         </button>
       </form>
     </div>

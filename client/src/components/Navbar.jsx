@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { LayoutDashboard, LogOut, User, LogIn, UserPlus } from "lucide-react";
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
@@ -9,36 +10,38 @@ export const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white/90 backdrop-blur-md shadow-lg sticky top-0 z-50">
+    <nav className="bg-white/70 backdrop-blur-xl shadow-md sticky top-0 z-50 border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
+          {/* Logo + Brand */}
           <div className="flex items-center">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">FQ</span>
+            <Link to="/" className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
+                <span className="text-white font-bold text-xs tracking-tight">
+                  FQ
+                </span>
               </div>
-              <Link to="/">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-orange-700 bg-clip-text text-transparent hover:from-orange-700 hover:to-orange-800 transition-all duration-300">
-                  FairQ
-                </h1>
-              </Link>
-            </div>
+              <h1 className="text-xl sm:text-2xl font-extrabold bg-gradient-to-r from-orange-600 to-orange-700 bg-clip-text text-transparent hover:from-orange-700 hover:to-orange-800 transition-all duration-300 tracking-tight">
+                FairQ
+              </h1>
+            </Link>
           </div>
-          
+
+          {/* Right side */}
           <div className="flex items-center space-x-4">
             {user ? (
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3 sm:space-x-4">
                 {/* User Info */}
-                <div className="flex items-center space-x-2 bg-orange-50 px-3 py-2 rounded-full">
-                  <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                <div className="flex items-center space-x-2 bg-orange-50/90 px-3 py-1.5 rounded-full border border-orange-100 shadow-sm">
+                  <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center shadow-sm">
                     <span className="text-white text-xs font-bold">
                       {user.firstName.charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <span className="text-gray-700 font-medium hidden sm:inline">
+                  <span className="hidden sm:inline text-xs sm:text-sm text-slate-700 font-medium">
                     Welcome, {user.firstName}!
                   </span>
-                  <span className="text-gray-700 font-medium sm:hidden">
+                  <span className="sm:hidden text-xs text-slate-700 font-medium">
                     {user.firstName}
                   </span>
                 </div>
@@ -46,8 +49,9 @@ export const Navbar = () => {
                 {/* Dashboard Button */}
                 <Link
                   to={`/${user.role.toLowerCase()}/dashboard`}
-                  className="bg-gradient-to-r from-orange-600 to-orange-700 text-white px-4 sm:px-6 py-2 rounded-full hover:from-orange-700 hover:to-orange-800 transition-all duration-300 transform hover:scale-105 shadow-lg text-sm font-medium"
+                  className="inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-600 to-orange-700 text-white px-3 sm:px-4 py-1.5 rounded-full hover:from-orange-700 hover:to-orange-800 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg text-xs sm:text-sm font-medium"
                 >
+                  <LayoutDashboard size={16} className="hidden sm:block" />
                   <span className="hidden sm:inline">Dashboard</span>
                   <span className="sm:hidden">📊</span>
                 </Link>
@@ -55,25 +59,28 @@ export const Navbar = () => {
                 {/* Logout Button */}
                 <button
                   onClick={handleLogout}
-                  className="bg-gray-600 text-white px-4 sm:px-6 py-2 rounded-full hover:bg-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg text-sm font-medium"
+                  className="inline-flex items-center gap-1.5 bg-slate-800 text-white px-3 sm:px-4 py-1.5 rounded-full hover:bg-black transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg text-xs sm:text-sm font-medium"
                 >
+                  <LogOut size={16} className="hidden sm:block" />
                   <span className="hidden sm:inline">Logout</span>
                   <span className="sm:hidden">🚪</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3 sm:space-x-4">
                 <Link
                   to="/login"
-                  className="text-gray-700 hover:text-orange-600 transition-colors font-medium"
+                  className="inline-flex items-center gap-1.5 text-slate-700 hover:text-orange-600 transition-colors font-medium text-xs sm:text-sm"
                 >
-                  Login
+                  <LogIn size={15} className="hidden sm:block" />
+                  <span>Login</span>
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-gradient-to-r from-orange-600 to-orange-700 text-white px-6 py-2 rounded-full hover:from-orange-700 hover:to-orange-800 transition-all duration-300 transform hover:scale-105 shadow-lg"
+                  className="inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-600 to-orange-700 text-white px-4 sm:px-5 py-1.5 rounded-full hover:from-orange-700 hover:to-orange-800 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg text-xs sm:text-sm font-medium"
                 >
-                  Register
+                  <UserPlus size={16} className="hidden sm:block" />
+                  <span>Register</span>
                 </Link>
               </div>
             )}

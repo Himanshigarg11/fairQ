@@ -1,525 +1,431 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { getAllTickets, updateTicketStatus } from "../../services/ticketService";
 import {
-  getSortedQueue,
-  updateTicketStatus,
-} from "../../services/ticketService";
+  Clock,
+  CheckCircle,
+  Loader,
+  Users,
+  QrCode,
+  Filter,
+  TicketIcon,
+} from "lucide-react";
+
+/* Priority helpers (unchanged logic) */
+const normalizePriority = (priority) => {
+  if (!priority) return "Normal";
+  if (priority.emergency) return "Emergency";
+  if (priority.elderly) return "Elderly";
+  return "Normal";
+};
+
+const priorityRank = {
+  Emergency: 1,
+  Elderly: 2,
+  Normal: 3,
+};
 
 const StaffDashboard = () => {
   const { user } = useAuth();
+
   const [tickets, setTickets] = useState([]);
+  const [allTickets, setAllTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Pending");
-  const [error, setError] = useState("");
-  const [updating, setUpdating] = useState(null);
-  const [success, setSuccess] = useState(""); // Add success message state
+  const [organization, setOrganization] = useState("All");
+  const [success, setSuccess] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  const fetchTickets = React.useCallback(async () => {
-  try {
-    setLoading(true);
+  // Live clock
+  useEffect(() => {
+    const id = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
-    // Choose the serviceType your tickets are booked under
-    const serviceType = "General Checkup"; 
-    // OR whatever actual serviceType your users select
-    // You can make this dynamic later
+  // Load ALL tickets once
+  useEffect(() => {
+    const loadAll = async () => {
+      try {
+        const res = await getAllTickets();
+        setAllTickets(res.data.tickets || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadAll();
+  }, []);
 
-    const response = await getSortedQueue(serviceType);
-
-    setTickets(response.tickets);
-    setError("");
-  } catch (error) {
-    setError(error.message);
-  } finally {
-    setLoading(false);
-  }
-}, []);
-
+  // Load tickets by status
+  const fetchTickets = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await getAllTickets({ status: filter });
+      setTickets(res.data.tickets || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
 
   useEffect(() => {
     fetchTickets();
-  }, [filter, fetchTickets]);
+  }, [fetchTickets]);
 
-  // Clear success message after 3 seconds
+  // Auto-hide success
   useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(""), 3000);
-      return () => clearTimeout(timer);
-    }
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(""), 3000);
+    return () => clearTimeout(t);
   }, [success]);
 
-  const handleStatusUpdate = async (ticketId, newStatus, notes = "") => {
+  // Real-time status update
+  const handleStatusUpdate = async (id, status) => {
     try {
-      setUpdating(ticketId);
-      setError("");
+      await updateTicketStatus(id, status);
+      setSuccess(`Ticket updated to ${status}`);
 
-      // Find the current ticket to get its info for success message
-      const currentTicket = tickets.find((t) => t._id === ticketId);
-
-      await updateTicketStatus(ticketId, newStatus, notes);
-
-      // Set success message
-      const statusText =
-        newStatus === "Processing" ? "started processing" : "completed";
-      setSuccess(
-        `Ticket ${currentTicket?.ticketNumber} has been ${statusText} successfully!`
+      setTickets((prev) =>
+        prev
+          .map((t) =>
+            t._id === id
+              ? {
+                  ...t,
+                  status,
+                }
+              : t
+          )
+          .filter((t) => t.status === filter)
       );
 
-      // Auto-switch filter to show the updated ticket
-      if (newStatus === "Processing") {
-        setFilter("Processing");
-      } else if (newStatus === "Completed") {
-        setFilter("Completed");
-      }
+      setAllTickets((prev) =>
+        prev.map((t) =>
+          t._id === id
+            ? {
+                ...t,
+                status,
+              }
+            : t
+        )
+      );
 
-      // If filter doesn't change, refresh current view
-      if (
-        (newStatus === "Processing" && filter === "Processing") ||
-        (newStatus === "Completed" && filter === "Completed")
-      ) {
-        fetchTickets();
-      }
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setUpdating(null);
+      setFilter(status);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Pending":
-        return "bg-yellow-100 text-yellow-700";
-      case "Processing":
-        return "bg-blue-100 text-blue-700";
-      case "Completed":
-        return "bg-green-100 text-green-700";
-      case "Cancelled":
-        return "bg-red-100 text-red-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
+  // Filter + sort
+  const visibleTickets = tickets
+    .filter((t) =>
+      organization === "All" ? true : t.organization === organization
+    )
+    .sort(
+      (a, b) =>
+        priorityRank[normalizePriority(a.priority)] -
+        priorityRank[normalizePriority(b.priority)]
+    );
 
-  // FIXED: Now works with priority object from backend
-const getPriorityBadge = (priorityObj) => {
-  if (!priorityObj) {
-    return { label: "NORMAL", color: "bg-gray-500 text-white" };
-  }
-
-  if (priorityObj.emergency) {
-    return { label: "EMERGENCY", color: "bg-red-600 text-white animate-pulse" };
-  }
-
-  if (priorityObj.elderly) {
-    return { label: "ELDERLY", color: "bg-purple-600 text-white" };
-  }
-
-  if (priorityObj.prepared) {
-    return { label: "PREPARED", color: "bg-blue-600 text-white" };
-  }
-
-  return { label: "NORMAL", color: "bg-gray-500 text-white" };
-};
-
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
+  // Stats
   const stats = {
-    pending: tickets.filter((t) => t.status === "Pending").length,
-    processing: tickets.filter((t) => t.status === "Processing").length,
-    completed: tickets.filter((t) => t.status === "Completed").length,
+    pending: allTickets.filter((t) => t.status === "Pending").length,
+    processing: allTickets.filter((t) => t.status === "Processing").length,
+    completed: allTickets.filter((t) => t.status === "Completed").length,
+  };
+
+  const getPriorityBadge = (priority) => {
+    const p = normalizePriority(priority);
+    if (p === "Emergency")
+      return "bg-gradient-to-r from-red-500 to-rose-500 text-white animate-pulse font-semibold shadow-sm";
+    if (p === "Elderly")
+      return "bg-gradient-to-r from-purple-500 to-violet-500 text-white font-medium shadow-sm";
+    return "bg-slate-600 text-white";
+  };
+
+  const getStatusChip = (status) => {
+    if (status === "Pending")
+      return "bg-amber-50 text-amber-700 border border-amber-200";
+    if (status === "Processing")
+      return "bg-sky-50 text-sky-700 border border-sky-200";
+    if (status === "Completed")
+      return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+    return "bg-gray-50 text-gray-700 border border-gray-200";
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Staff Dashboard
-                </h1>
-                <p className="text-gray-600">
-                  Welcome back, {user?.firstName}!
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Link
-                to="/staff/scan-pit"
-                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors font-medium"
-              >
-                Scan PIT
-              </Link>
-
-              <Link
-                to="/"
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors font-medium"
-              >
-                Home
-              </Link>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-slate-50 to-emerald-50 relative overflow-hidden font-['Inter',_system-ui,_sans-serif]">
+      {/* Soft background blobs */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute -top-32 -left-16 h-72 w-72 bg-sky-300/30 blur-3xl rounded-full" />
+        <div className="absolute top-32 -right-24 h-80 w-80 bg-amber-300/30 blur-3xl rounded-full" />
+        <div className="absolute bottom-[-5rem] left-1/3 h-72 w-72 bg-emerald-300/25 blur-3xl rounded-full" />
       </div>
 
-      <div className="max-w-7xl mx-auto py-8 px-4">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div
-            className={`bg-white p-6 rounded-lg shadow hover:shadow-md transition-all cursor-pointer ${
-              filter === "Pending" ? "ring-2 ring-yellow-500" : ""
-            }`}
-            onClick={() => setFilter("Pending")}
-          >
-            <div className="flex items-center justify-between">
+      {/* HEADER */}
+      <header className="bg-white/80 border-b border-slate-100 shadow-sm backdrop-blur">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700 border border-blue-100 tracking-wide">
+              <Users size={14} />
+              STAFF WORKSPACE
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+                <TicketIcon size={22} />
+              </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium">
-                  Pending Tickets
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {stats.pending}
+                <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+                  Staff Dashboard
+                </h1>
+                <p className="text-sm text-slate-600">
+                  Welcome,{" "}
+                  <span className="font-semibold text-slate-900">
+                    {user?.firstName}
+                  </span>
+                  . Monitor and control live queue activity.
                 </p>
               </div>
-              <div className="w-12 h-12 bg-yellow-500 rounded-lg"></div>
             </div>
           </div>
-
-          <div
-            className={`bg-white p-6 rounded-lg shadow hover:shadow-md transition-all cursor-pointer ${
-              filter === "Processing" ? "ring-2 ring-blue-500" : ""
-            }`}
-            onClick={() => setFilter("Processing")}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">Processing</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {stats.processing}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-500 rounded-lg"></div>
-            </div>
-          </div>
-
-          <div
-            className={`bg-white p-6 rounded-lg shadow hover:shadow-md transition-all cursor-pointer ${
-              filter === "Completed" ? "ring-2 ring-green-500" : ""
-            }`}
-            onClick={() => setFilter("Completed")}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">
-                  Completed Today
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  {stats.completed}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-500 rounded-lg"></div>
-            </div>
+          <div className="flex gap-3">
+            <Link
+              to="/staff/scan-pit"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 hover:brightness-105 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+            >
+              <QrCode size={18} />
+              Scan PIT
+            </Link>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+            >
+              Home
+            </Link>
           </div>
         </div>
+      </header>
 
-        {/* Success Message */}
-        {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 animate-pulse">
-            <div className="flex items-center space-x-2">
-              <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs">✓</span>
-              </div>
-              <p className="text-sm text-green-700 font-medium">{success}</p>
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* STATS */}
+        <section className="grid md:grid-cols-3 gap-6">
+          <button
+            onClick={() => setFilter("Pending")}
+            className={`group flex items-center justify-between rounded-2xl border px-5 py-4 shadow-sm bg-white/95 hover:shadow-xl transition-all duration-200 ${
+              filter === "Pending"
+                ? "border-amber-400 ring-2 ring-amber-200"
+                : "border-slate-200"
+            }`}
+          >
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 flex items-center gap-1">
+                <Clock size={14} />
+                Pending
+              </p>
+              <p className="mt-2 text-3xl font-extrabold text-slate-900">
+                {stats.pending}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Tickets waiting to be picked.
+              </p>
             </div>
+            <div className="h-11 w-11 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600 group-hover:bg-amber-200 transition-colors">
+              <Clock size={22} />
+            </div>
+          </button>
+
+          <button
+            onClick={() => setFilter("Processing")}
+            className={`group flex items-center justify-between rounded-2xl border px-5 py-4 shadow-sm bg-white/95 hover:shadow-xl transition-all duration-200 ${
+              filter === "Processing"
+                ? "border-sky-400 ring-2 ring-sky-200"
+                : "border-slate-200"
+            }`}
+          >
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 flex items-center gap-1">
+                <Loader size={14} className="animate-spin-slow" />
+                Processing
+              </p>
+              <p className="mt-2 text-3xl font-extrabold text-slate-900">
+                {stats.processing}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Tickets currently in progress.
+              </p>
+            </div>
+            <div className="h-11 w-11 rounded-2xl bg-sky-100 flex items-center justify-center text-sky-600 group-hover:bg-sky-200 transition-colors">
+              <Loader size={22} className="animate-spin-slow" />
+            </div>
+          </button>
+
+          <button
+            onClick={() => setFilter("Completed")}
+            className={`group flex items-center justify-between rounded-2xl border px-5 py-4 shadow-sm bg-white/95 hover:shadow-xl transition-all duration-200 ${
+              filter === "Completed"
+                ? "border-emerald-400 ring-2 ring-emerald-200"
+                : "border-slate-200"
+            }`}
+          >
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 flex items-center gap-1">
+                <CheckCircle size={14} />
+                Completed
+              </p>
+              <p className="mt-2 text-3xl font-extrabold text-slate-900">
+                {stats.completed}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Tickets closed successfully.
+              </p>
+            </div>
+            <div className="h-11 w-11 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-200 transition-colors">
+              <CheckCircle size={22} />
+            </div>
+          </button>
+        </section>
+
+        {/* SUCCESS BANNER */}
+        {success && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-sm text-emerald-800 flex items-center gap-2 shadow-sm animate-[fadeIn_0.2s_ease-out]">
+            <CheckCircle size={18} className="text-emerald-500" />
+            <span className="font-medium">{success}</span>
           </div>
         )}
 
-        {/* Ticket Management */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
-              Ticket Management
-              <span className="text-sm font-normal text-gray-500 ml-2">
-                (Showing {filter} Tickets)
-              </span>
-            </h2>
+        {/* FILTER BAR */}
+        <section className="rounded-2xl bg-white/95 border border-slate-200 shadow-sm px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="inline-flex items-center gap-2 text-sm text-slate-600">
+            <Filter size={16} />
+            <span className="font-semibold">Filters</span>
+            <span className="text-xs text-slate-400">
+              Narrow by organization and status.
+            </span>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <select
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              className="border border-slate-300 bg-white px-3 py-2 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            >
+              <option value="All">All Organizations</option>
+              {[...new Set(allTickets.map((t) => t.organization))].map(
+                (org) => (
+                  <option key={org} value={org}>
+                    {org}
+                  </option>
+                )
+              )}
+            </select>
+
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="border border-slate-300 bg-white px-3 py-2 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
             >
-              <option value="Pending">Pending Tickets</option>
-              <option value="Processing">Processing Tickets</option>
-              <option value="Completed">Completed Tickets</option>
+              <option>Pending</option>
+              <option>Processing</option>
+              <option>Completed</option>
             </select>
           </div>
+        </section>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-red-700 font-medium">{error}</p>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-gray-600 ml-3">
-                Loading {filter.toLowerCase()} tickets...
-              </p>
-            </div>
-          ) : tickets.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">
-                {filter === "Pending"
-                  ? "⏳"
-                  : filter === "Processing"
-                  ? "🔄"
-                  : "✅"}
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No {filter} Tickets
-              </h3>
-              <p className="text-gray-600">
-                {filter === "Pending"
-                  ? "No tickets waiting to be processed."
-                  : filter === "Processing"
-                  ? "No tickets currently being processed."
-                  : "No tickets completed yet today."}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {tickets.map((ticket) => (
-                <div
-                  key={ticket._id}
-                  className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    {/* Ticket Header */}
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {ticket.ticketNumber}
-                        </h3>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-bold ${
-                            getPriorityBadge(ticket.priority).color
-                          }`}
-                        >
-                          {getPriorityBadge(ticket.priority).label}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3">
-                        {ticket.organization} - {ticket.serviceType}
-                      </p>
+        {/* LIST */}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader className="animate-spin text-sky-500" size={28} />
+          </div>
+        ) : visibleTickets.length === 0 ? (
+          <div className="text-center text-slate-500 py-12 bg-white/95 rounded-2xl border border-dashed border-slate-200">
+            <Users size={40} className="mx-auto mb-3 text-slate-400" />
+            <p className="font-medium">No tickets found</p>
+            <p className="text-xs mt-1">
+              Try changing the status or organization filters.
+            </p>
+          </div>
+        ) : (
+          <section className="space-y-5">
+            {visibleTickets.map((t) => (
+              <article
+                key={t._id}
+                className="bg-white/95 rounded-2xl shadow-sm border border-slate-200 hover:border-sky-200 hover:shadow-xl transition-all duration-200 p-5"
+              >
+                <div className="flex justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-slate-900 text-sm md:text-base">
+                        {t.ticketNumber}
+                      </h3>
+                      <span
+                        className={`text-[11px] px-2 py-1 rounded-full ${getPriorityBadge(
+                          t.priority
+                        )}`}
+                      >
+                        {normalizePriority(t.priority)}
+                      </span>
                     </div>
-
-                    {/* Status Badge */}
+                    <p className="text-xs md:text-sm text-slate-600 mt-1">
+                      {t.organization} — {t.serviceType}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Customer:{" "}
+                      <span className="font-medium text-slate-800">
+                        {t.customer?.firstName} {t.customer?.lastName}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                        ticket.status
+                      className={`text-[11px] px-3 py-1 rounded-full font-medium ${getStatusChip(
+                        t.status
                       )}`}
                     >
-                      {ticket.status}
+                      {t.status}
                     </span>
-                  </div>
-
-                  {/* Customer & Ticket Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">
-                        Customer
-                      </p>
-                      <p className="font-medium text-gray-900">
-                        {ticket.customer.firstName} {ticket.customer.lastName}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {ticket.customer.email}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">
-                        Purpose
-                      </p>
-                      <p className="font-medium text-gray-900 text-sm">
-                        {ticket.purpose}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">
-                        Booked
-                      </p>
-                      <p className="font-medium text-gray-900">
-                        {formatDate(ticket.bookedAt)}
-                      </p>
-                    </div>
-                    {ticket.queuePosition && (
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide">
-                          Queue Position
-                        </p>
-                        <p className="font-medium text-gray-900">
-                          #{ticket.queuePosition}
-                        </p>
-                      </div>
+                    {t.queuePosition && (
+                      <span className="text-xs text-slate-500">
+                        Queue:{" "}
+                        <span className="font-semibold text-slate-800">
+                          #{t.queuePosition}
+                        </span>
+                      </span>
                     )}
                   </div>
-
-                  {/* Staff Notes */}
-                  {ticket.notes && (
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">
-                        Staff Notes
-                      </p>
-                      <p className="text-sm text-gray-700 mt-1">
-                        {ticket.notes}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center space-x-3">
-                    {ticket.status === "Pending" && (
-                      <button
-                        onClick={() =>
-                          handleStatusUpdate(ticket._id, "Processing")
-                        }
-                        disabled={updating === ticket._id}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {updating === ticket._id ? (
-                          <div className="flex items-center space-x-2">
-                            <div className="w-4 h-4 border border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Starting...</span>
-                          </div>
-                        ) : (
-                          "Start Processing"
-                        )}
-                      </button>
-                    )}
-
-                    {ticket.status === "Processing" && (
-                      <button
-                        onClick={() =>
-                          handleStatusUpdate(ticket._id, "Completed")
-                        }
-                        disabled={updating === ticket._id}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {updating === ticket._id ? (
-                          <div className="flex items-center space-x-2">
-                            <div className="w-4 h-4 border border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Completing...</span>
-                          </div>
-                        ) : (
-                          "Mark Complete"
-                        )}
-                      </button>
-                    )}
-
-                    {ticket.status === "Completed" && (
-                      <div className="flex items-center space-x-2 text-green-600">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                          <span className="text-green-600 text-xs">✓</span>
-                        </div>
-                        <span className="text-sm font-medium">Completed</span>
-                        {ticket.completedAt && (
-                          <span className="text-sm text-gray-500">
-                            on {formatDate(ticket.completedAt)}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Timeline for completed tickets */}
-                  {ticket.status === "Completed" &&
-                    (ticket.processedAt || ticket.completedAt) && (
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-                          Timeline
-                        </p>
-                        <div className="flex items-center space-x-4 text-xs text-gray-600">
-                          <span>Booked: {formatDate(ticket.bookedAt)}</span>
-                          {ticket.processedAt && (
-                            <span>
-                              Started: {formatDate(ticket.processedAt)}
-                            </span>
-                          )}
-                          {ticket.completedAt && (
-                            <span>
-                              Completed: {formatDate(ticket.completedAt)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Quick Stats Footer */}
-        {tickets.length > 0 && (
-          <div className="mt-8 bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <span>
-                Showing {tickets.length} {filter.toLowerCase()} tickets
-              </span>
-              <span>Last updated: {new Date().toLocaleTimeString()}</span>
-            </div>
-          </div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {t.status === "Pending" && (
+                    <button
+                      onClick={() => handleStatusUpdate(t._id, "Processing")}
+                      className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-transform hover:-translate-y-0.5"
+                    >
+                      <Loader size={16} className="animate-spin-slow" />
+                      Start Processing
+                    </button>
+                  )}
+                  {t.status === "Processing" && (
+                    <button
+                      onClick={() => handleStatusUpdate(t._id, "Completed")}
+                      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-transform hover:-translate-y-0.5"
+                    >
+                      <CheckCircle size={16} />
+                      Mark Completed
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </section>
         )}
 
-        {/* Quick Action Buttons */}
-        <div className="mt-8 flex items-center space-x-4">
-          <button
-            onClick={() => setFilter("Pending")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === "Pending"
-                ? "bg-yellow-500 text-white"
-                : "bg-white text-yellow-600 border border-yellow-500 hover:bg-yellow-50"
-            }`}
-          >
-            View Pending ({stats.pending})
-          </button>
-          <button
-            onClick={() => setFilter("Processing")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === "Processing"
-                ? "bg-blue-500 text-white"
-                : "bg-white text-blue-600 border border-blue-500 hover:bg-blue-50"
-            }`}
-          >
-            View Processing ({stats.processing})
-          </button>
-          <button
-            onClick={() => setFilter("Completed")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === "Completed"
-                ? "bg-green-500 text-white"
-                : "bg-white text-green-600 border border-green-500 hover:bg-green-50"
-            }`}
-          >
-            View Completed ({stats.completed})
-          </button>
-        </div>
-      </div>
+        {/* Footer helper */}
+        <footer className="mt-6 text-[11px] text-slate-400 text-right flex items-center justify-end gap-2">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/70 border border-slate-200 shadow-sm">
+            <Clock size={12} className="text-slate-500" />
+            <span>Updated at {currentTime.toLocaleTimeString()}</span>
+          </span>
+        </footer>
+      </main>
     </div>
   );
 };
