@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { registerUser, loginUser, getProfile } from '../services/authService';
+import { registerForPushNotifications } from '../services/notificationService';
 
 const AuthContext = createContext(null);
 
@@ -42,7 +43,8 @@ export const AuthProvider = ({ children }) => {
       setToken(token);
       localStorage.setItem('fairq_token', token);
       localStorage.setItem('fairq_user', JSON.stringify(user));
-      
+      registerForPushNotifications(token);
+
       return user;
     } catch (error) {
       setError(error.message);
@@ -63,7 +65,8 @@ export const AuthProvider = ({ children }) => {
       setToken(token);
       localStorage.setItem('fairq_token', token);
       localStorage.setItem('fairq_user', JSON.stringify(user));
-      
+      registerForPushNotifications(token);
+
       return user;
     } catch (error) {
       setError(error.message);

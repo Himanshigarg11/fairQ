@@ -1,15 +1,14 @@
-import express from 'express';
-import { register, login, getProfile } from '../controllers/authController.js';
-import { authenticate } from '../middleware/authMiddleware.js';
+import express from "express";
+import { register, login, getProfile, saveFcmToken } from "../controllers/authController.js";
+import { authenticate } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Test route
-router.get('/test', (req, res) => res.json({ message: 'Auth routes working' }));
+router.post("/register", register);
+router.post("/login", login);
+router.get("/profile", authenticate, getProfile);
 
-// Auth endpoints
-router.post('/register', register);
-router.post('/login', login);
-router.get('/profile', authenticate, getProfile);
+// ✅ THIS MUST EXIST
+router.post("/save-fcm-token", authenticate, saveFcmToken);
 
 export default router;

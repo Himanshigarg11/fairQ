@@ -1,6 +1,9 @@
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
+import { sendPushNotification } from "../services/notificationService.js";
 import { reorderTickets } from "../utils/reorderQueue.js";
+
+
 export const requiredDocsList = {
   Hospital: ["Aadhar Card", "Doctor Prescription", "Medical Report"],
   Bank: ["Aadhar Card", "PAN Card", "Passbook Copy"],
@@ -87,7 +90,19 @@ export const bookTicket = async (req, res) => {
 
     console.log('✅ Ticket created successfully:', ticket._id);
 
-    await ticket.populate('customer', 'firstName lastName email');
+    await ticket.populate('customer', 'firstName lastName email fcmToken')
+
+    
+    // 🔔 Push notification: Ticket Booked
+await sendPushNotification({
+  token: ticket.customer.fcmToken,
+  title: "🎟 Ticket Booked",
+  body: `Your ticket ${ticket.ticketNumber} has been booked successfully.`,
+  data: {
+    ticketId: ticket._id.toString(),
+    status: "Pending",
+  },
+});
 
     // TODO: Send email notification
     console.log(`📧 Email notification: Ticket ${ticket.ticketNumber} booked for ${ticket.customer.email}`);
@@ -209,10 +224,34 @@ export const updateTicketStatus = async (req, res) => {
       ticketId,
       updateData,
       { new: true }
-    ).populate('customer', 'firstName lastName email')
-     .populate('processedBy', 'firstName lastName');
+    ).populate('customer', 'firstName lastName email fcmToken')
+.populate('processedBy', 'firstName lastName');
 
     console.log('✅ Ticket updated successfully:', updatedTicket.ticketNumber);
+     // 🔔 Push notifications for status updates
+if (status === "Processing") {
+  await sendPushNotification({
+    token: updatedTicket.customer.fcmToken,
+    title: "⏳ Ticket Processing",
+    body: `Your ticket ${updatedTicket.ticketNumber} is now being processed.`,
+    data: {
+      ticketId: updatedTicket._id.toString(),
+      status: "Processing",
+    },
+  });
+}
+
+if (status === "Completed") {
+  await sendPushNotification({
+    token: updatedTicket.customer?.fcmToken,
+    title: "✅ Ticket Completed",
+    body: `Your ticket ${updatedTicket.ticketNumber} has been completed.`,
+    data: {
+      ticketId: updatedTicket._id.toString(),
+      status: "Completed",
+    },
+  });
+}
 
     // TODO: Send status update email
     console.log(`📧 Status update email: Ticket ${updatedTicket.ticketNumber} is now ${status}`);

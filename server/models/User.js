@@ -29,6 +29,11 @@ const userSchema = new mongoose.Schema(
         message: "Phone number must be 10 digits",
       },
     },
+    fcmToken: {
+  type: String,
+  default: null,
+},
+
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

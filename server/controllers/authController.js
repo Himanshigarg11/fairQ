@@ -105,3 +105,32 @@ export const getProfile = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// Save FCM token (for push notifications)
+export const saveFcmToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "FCM token is required",
+      });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, {
+      fcmToken: token,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "FCM token saved successfully",
+    });
+  } catch (error) {
+    console.error("Save FCM token error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save FCM token",
+    });
+  }
+};
+
