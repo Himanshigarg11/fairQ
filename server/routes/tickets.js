@@ -1,6 +1,7 @@
 // server/routes/tickets.js
-import express from 'express';
-import multer from 'multer';
+import express from "express";
+import multer from "multer";
+
 import {
   bookTicket,
   getCustomerTickets,
@@ -8,35 +9,91 @@ import {
   updateTicketStatus,
   getTicketById,
   getTicketStats,
-  uploadDocuments   // this must match the name exported from controller
-} from '../controllers/ticketController.js';
-import { authenticate, authorize } from '../middleware/authMiddleware.js';
-import { getSortedQueue } from "../controllers/ticketController.js";
+  uploadDocuments,
+  getSortedQueue,
+} from "../controllers/ticketController.js";
+
+import { authenticate, authorize } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// configure multer (temporary storage)
-const upload = multer({ dest: 'uploads/' }); // you can later swap to cloud storage
+// ----------------------
+// Multer config
+// ----------------------
+const upload = multer({ dest: "uploads/" });
 
-// Document upload route (customer uploads files for a ticket)
+// ----------------------
+// CUSTOMER ROUTES
+// ----------------------
+
+// Book ticket
 router.post(
-  '/:ticketId/upload-documents',
+  "/book",
   authenticate,
-  authorize('Customer'),
-  upload.array('files', 5), // form field name "files", up to 5 files
+  authorize("Customer"),
+  bookTicket
+);
+
+// Get logged-in customer's tickets
+router.get(
+  "/my-tickets",
+  authenticate,
+  authorize("Customer"),
+  getCustomerTickets
+);
+
+// Upload documents for a ticket
+router.post(
+  "/:ticketId/upload-documents",
+  authenticate,
+  authorize("Customer"),
+  upload.array("files", 5),
   uploadDocuments
 );
 
-// Customer routes
-router.post('/book', authenticate, authorize('Customer'), bookTicket);
-router.get('/my-tickets', authenticate, authorize('Customer'), getCustomerTickets);
-router.get('/:ticketId', authenticate, getTicketById);
+// Get single ticket by ID
+router.get(
+  "/:ticketId",
+  authenticate,
+  getTicketById
+);
 
-// Staff/Admin routes
-router.get('/', authenticate, authorize('Staff', 'Admin'), getAllTickets);
-router.put('/:ticketId/status', authenticate, authorize('Staff', 'Admin'), updateTicketStatus);
-router.get('/admin/stats', authenticate, authorize('Admin'), getTicketStats);
+// ----------------------
+// STAFF / ADMIN ROUTES
+// ----------------------
 
-router.get("/queue/:serviceType/sorted", authenticate, authorize("Staff", "Admin"), getSortedQueue);
+// Get all tickets (filters via query: status, organization)
+router.get(
+  "/",
+  authenticate,
+  authorize("Staff", "Admin"),
+  getAllTickets
+);
+
+// Update ticket status (THIS TRIGGERS SOCKET EVENT)
+router.put(
+  "/:ticketId/status",
+  authenticate,
+  authorize("Staff", "Admin"),
+  updateTicketStatus
+);
+
+// Sorted queue (used by staff dashboard)
+router.get(
+  "/queue/:serviceType/sorted",
+  authenticate,
+  authorize("Staff", "Admin"),
+  getSortedQueue
+);
+
+// ----------------------
+// ADMIN ROUTES
+// ----------------------
+router.get(
+  "/admin/stats",
+  authenticate,
+  authorize("Admin"),
+  getTicketStats
+);
 
 export default router;

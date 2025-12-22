@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { getAllTickets, updateTicketStatus } from "../../services/ticketService";
+import {
+  getAllTickets,
+  updateTicketStatus,
+} from "../../services/ticketService";
 import {
   Clock,
   CheckCircle,
@@ -11,6 +14,7 @@ import {
   Filter,
   TicketIcon,
 } from "lucide-react";
+import { socket } from "../../socket";
 
 /* Priority helpers (unchanged logic) */
 const normalizePriority = (priority) => {
@@ -36,6 +40,41 @@ const StaffDashboard = () => {
   const [success, setSuccess] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  useEffect(() => {
+    socket.on("newTicketBooked", (newTicket) => {
+      // Only show tickets for this staff's hospital
+      if (
+        newTicket.hospitalName === user?.assignedHospital &&
+        newTicket.status === filter
+      ) {
+        setTickets((prev) => [newTicket, ...prev]);
+      }
+
+      // Always update stats list
+      setAllTickets((prev) => [newTicket, ...prev]);
+    });
+
+    return () => {
+      socket.off("newTicketBooked");
+    };
+  }, [filter, user]);
+
+  useEffect(() => {
+    socket.on("staffTicketUpdated", (updatedTicket) => {
+      setTickets((prev) =>
+        prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t))
+      );
+
+      setAllTickets((prev) =>
+        prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t))
+      );
+    });
+
+    return () => {
+      socket.off("staffTicketUpdated");
+    };
+  }, []);
+
   // Live clock
   useEffect(() => {
     const id = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -43,25 +82,24 @@ const StaffDashboard = () => {
   }, []);
 
   // Load tickets by status
-const fetchTickets = useCallback(async () => {
-  if (!user?.assignedHospital) return;
+  const fetchTickets = useCallback(async () => {
+    if (!user?.assignedHospital) return;
 
-  try {
-    setLoading(true);
-    const res = await getAllTickets({
-      status: filter,
-      organization: user.assignedHospital,
-    });
+    try {
+      setLoading(true);
+      const res = await getAllTickets({
+        status: filter,
+        organization: user.assignedHospital,
+      });
 
-    setTickets(res.data.tickets || []);
-    setAllTickets(res.data.tickets || []);
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-}, [filter, user]);
-
+      setTickets(res.data.tickets || []);
+      setAllTickets(res.data.tickets || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, user]);
 
   useEffect(() => {
     fetchTickets();
@@ -111,12 +149,11 @@ const fetchTickets = useCallback(async () => {
   };
 
   // Filter + sort
-const visibleTickets = tickets.sort(
-  (a, b) =>
-    priorityRank[normalizePriority(a.priority)] -
-    priorityRank[normalizePriority(b.priority)]
-);
-
+  const visibleTickets = tickets.sort(
+    (a, b) =>
+      priorityRank[normalizePriority(a.priority)] -
+      priorityRank[normalizePriority(b.priority)]
+  );
 
   // Stats
   const stats = {
@@ -176,7 +213,6 @@ const visibleTickets = tickets.sort(
                   </span>
                 </p>
 
-                
                 <p className="text-sm text-slate-600">
                   Welcome,{" "}
                   <span className="font-semibold text-slate-900">
@@ -302,8 +338,6 @@ const visibleTickets = tickets.sort(
             </span>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-
-
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}

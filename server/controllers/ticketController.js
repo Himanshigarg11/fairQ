@@ -1,5 +1,5 @@
-import Ticket from '../models/Ticket.js';
-import User from '../models/User.js';
+import Ticket from "../models/Ticket.js";
+import User from "../models/User.js";
 import { sendPushNotification } from "../services/notificationService.js";
 import { reorderTickets } from "../utils/reorderQueue.js";
 import {
@@ -7,9 +7,8 @@ import {
   sendProcessingStartedEmail,
   sendCompletedEmail,
   sendTurnAlertEmail,
-  sendArrivalWindowEmail
+  sendArrivalWindowEmail,
 } from "../services/emailService.js";
-
 
 export const requiredDocsList = {
   Hospital: ["Aadhar Card", "Doctor Prescription", "Medical Report"],
@@ -17,54 +16,56 @@ export const requiredDocsList = {
   "Government Office": ["Aadhar Card", "Application Form", "Passport Photo"],
   "Post Office": ["ID Proof", "Application Slip"],
   "Telecom Office": ["Aadhar Card", "Old SIM", "Passport Photo"],
-  "Airport": ["Ticket Copy", "ID Proof"],
-  "Restaurant": ["Reservation ID (optional)"],
-  DMV: ["Driving License Form", "2 Photos", "ID Proof"]
+  Airport: ["Ticket Copy", "ID Proof"],
+  Restaurant: ["Reservation ID (optional)"],
+  DMV: ["Driving License Form", "2 Photos", "ID Proof"],
 };
 
 // Helper function to generate unique ticket number
 const generateTicketNumber = async (organization) => {
   let isUnique = false;
-  let ticketNumber = '';
-  
+  let ticketNumber = "";
+
   while (!isUnique) {
     const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "");
     const orgCode = organization.substring(0, 3).toUpperCase();
-    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const randomNum = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, "0");
     ticketNumber = `${orgCode}-${dateStr}-${randomNum}`;
-    
+
     // Check if this ticket number already exists
     const existingTicket = await Ticket.findOne({ ticketNumber });
     if (!existingTicket) {
       isUnique = true;
     }
   }
-  
+
   return ticketNumber;
 };
 
 // Book a new ticket
 export const bookTicket = async (req, res) => {
   try {
-    console.log('📝 Book ticket request received:', req.body);
-    
+    console.log("📝 Book ticket request received:", req.body);
+
     const {
       organization,
       hospitalName,
       serviceType,
       purpose,
       priority,
-      isEmergency
+      isEmergency,
     } = req.body;
     const customerId = req.user._id;
 
     // Validation
     if (!organization || !serviceType || !purpose) {
-      console.log('❌ Validation failed: missing required fields');
+      console.log("❌ Validation failed: missing required fields");
       return res.status(400).json({
         success: false,
-        message: 'Organization, service type, and purpose are required'
+        message: "Organization, service type, and purpose are required",
       });
     }
 
@@ -75,20 +76,18 @@ export const bookTicket = async (req, res) => {
       });
     }
 
-
-    console.log('✅ Validation passed');
+    console.log("✅ Validation passed");
 
     // Generate unique ticket number
     const ticketNumber = await generateTicketNumber(organization);
-    console.log('🎫 Generated ticket number:', ticketNumber);
+    console.log("🎫 Generated ticket number:", ticketNumber);
 
     // Get current queue position
     const pendingTickets = await Ticket.countDocuments({
       organization,
       hospitalName,
-      status: { $in: ['Pending', 'Processing'] }
+      status: { $in: ["Pending", "Processing"] },
     });
-
 
     const queuePosition = pendingTickets + 1;
     const estimatedWaitTime = queuePosition * 15; // 15 minutes per person
@@ -98,11 +97,9 @@ export const bookTicket = async (req, res) => {
       now.getTime() + (estimatedWaitTime - 10) * 60000
     );
 
-    const arrivalEnd = new Date(
-      arrivalStart.getTime() + 15 * 60000
-    );
+    const arrivalEnd = new Date(arrivalStart.getTime() + 15 * 60000);
 
-    console.log('📊 Queue info:', { queuePosition, estimatedWaitTime });
+    console.log("📊 Queue info:", { queuePosition, estimatedWaitTime });
 
     // Create ticket
     const ticket = await Ticket.create({
@@ -113,9 +110,9 @@ export const bookTicket = async (req, res) => {
       serviceType,
       purpose,
       priority: {
-      emergency: isEmergency === true,
-      elderly: priority === "Elderly",
-      prepared: false // becomes true only after PIT scan
+        emergency: isEmergency === true,
+        elderly: priority === "Elderly",
+        prepared: false, // becomes true only after PIT scan
       },
       arrivalWindow: {
         start: arrivalStart,
@@ -123,62 +120,58 @@ export const bookTicket = async (req, res) => {
       },
       isEmergency,
       queuePosition,
-      estimatedWaitTime
+      estimatedWaitTime,
     });
 
-    console.log('✅ Ticket created successfully:', ticket._id);
+    console.log("✅ Ticket created successfully:", ticket._id);
 
-   await ticket.populate(
-  'customer',
-  'firstName lastName email fcmToken notificationPreferences'
-);
+    await ticket.populate(
+      "customer",
+      "firstName lastName email fcmToken notificationPreferences"
+    );
 
-if (
-  ticket.customer?.fcmToken &&
-  ticket.customer.notificationPreferences?.pushEnabled
-) {
-  await sendPushNotification({
-    token: ticket.customer.fcmToken,
-    title: "🎟 Ticket Booked",
-    body: `Your ticket ${ticket.ticketNumber} has been booked successfully.`,
-    data: {
-      ticketId: ticket._id.toString(),
-      status: "Pending",
-    },
-  });
-}
+    if (
+      ticket.customer?.fcmToken &&
+      ticket.customer.notificationPreferences?.pushEnabled
+    ) {
+      await sendPushNotification({
+        token: ticket.customer.fcmToken,
+        title: "🎟 Ticket Booked",
+        body: `Your ticket ${ticket.ticketNumber} has been booked successfully.`,
+        data: {
+          ticketId: ticket._id.toString(),
+          status: "Pending",
+        },
+      });
+    }
 
     // TODO: Send email notification
-if (
-  ticket.customer?.email &&
-  ticket.customer.notificationPreferences?.emailEnabled
-) {
-  sendTicketBookedEmail(ticket, ticket.customer)
-    .then(() => {
-      console.log(
-        `📧 Ticket booked email sent to ${ticket.customer.email}`
-      );
-    })
-    .catch((err) => {
-      console.error(
-        "❌ Failed to send ticket booked email:",
-        err.message
-      );
-    });
-}
-
-
+    if (
+      ticket.customer?.email &&
+      ticket.customer.notificationPreferences?.emailEnabled
+    ) {
+      sendTicketBookedEmail(ticket, ticket.customer)
+        .then(() => {
+          console.log(
+            `📧 Ticket booked email sent to ${ticket.customer.email}`
+          );
+        })
+        .catch((err) => {
+          console.error("❌ Failed to send ticket booked email:", err.message);
+        });
+    }
+    const io = req.app.get("io");
+    io.emit("newTicketBooked", ticket);
     res.status(201).json({
       success: true,
-      message: 'Ticket booked successfully',
-      data: { ticket }
+      message: "Ticket booked successfully",
+      data: { ticket },
     });
-    
   } catch (error) {
-    console.error('❌ Book ticket error:', error);
+    console.error("❌ Book ticket error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to book ticket'
+      message: error.message || "Failed to book ticket",
     });
   }
 };
@@ -189,27 +182,27 @@ export const getCustomerTickets = async (req, res) => {
     const customerId = req.user._id;
     const { status } = req.query;
 
-    console.log('📋 Fetching tickets for customer:', customerId);
+    console.log("📋 Fetching tickets for customer:", customerId);
 
     const filter = { customer: customerId };
     if (status) filter.status = status;
 
     const tickets = await Ticket.find(filter)
-      .populate('customer', 'firstName lastName email')
-      .populate('processedBy', 'firstName lastName')
+      .populate("customer", "firstName lastName email")
+      .populate("processedBy", "firstName lastName")
       .sort({ createdAt: -1 });
 
     console.log(`✅ Found ${tickets.length} tickets for customer`);
 
     res.status(200).json({
       success: true,
-      data: { tickets }
+      data: { tickets },
     });
   } catch (error) {
-    console.error('❌ Get customer tickets error:', error);
+    console.error("❌ Get customer tickets error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to get tickets'
+      message: error.message || "Failed to get tickets",
     });
   }
 };
@@ -218,9 +211,12 @@ export const getCustomerTickets = async (req, res) => {
 export const getAllTickets = async (req, res) => {
   try {
     const { status, organization } = req.query;
-    
-    console.log('📋 Fetching all tickets with filters:', { status, organization });
-    
+
+    console.log("📋 Fetching all tickets with filters:", {
+      status,
+      organization,
+    });
+
     const filter = {};
 
     if (req.user.role === "Staff") {
@@ -233,38 +229,34 @@ export const getAllTickets = async (req, res) => {
     if (status) filter.status = status;
 
     const tickets = await Ticket.find(filter)
-      .populate('customer', 'firstName lastName email phoneNumber')
-      .populate('processedBy', 'firstName lastName')
-      .sort({ 
+      .populate("customer", "firstName lastName email phoneNumber")
+      .populate("processedBy", "firstName lastName")
+      .sort({
         priority: -1, // Emergency first
-        createdAt: 1   // Then by booking time
+        createdAt: 1, // Then by booking time
       });
 
     console.log(`✅ Found ${tickets.length} tickets`);
 
     res.status(200).json({
       success: true,
-      data: { tickets }
+      data: { tickets },
     });
   } catch (error) {
-    console.error('❌ Get all tickets error:', error);
+    console.error("❌ Get all tickets error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to get tickets'
+      message: error.message || "Failed to get tickets",
     });
   }
 };
 
-// Update ticket status
 export const updateTicketStatus = async (req, res) => {
   try {
     const { ticketId } = req.params;
     const { status, notes } = req.body;
     const staffId = req.user._id;
 
-    /* =======================
-       ✅ STATUS VALIDATION
-    ======================= */
     const ALLOWED_STATUSES = ["Pending", "Processing", "Completed"];
     if (!ALLOWED_STATUSES.includes(status)) {
       return res.status(400).json({
@@ -273,21 +265,7 @@ export const updateTicketStatus = async (req, res) => {
       });
     }
 
-    console.log("🔄 Updating ticket status:", { ticketId, status, notes });
-
-    /* =======================
-       🔍 FETCH TICKET
-    ======================= */
     const ticket = await Ticket.findById(ticketId);
-    if (
-      req.user.role === "Staff" &&
-      ticket.hospitalName !== req.user.assignedHospital
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized to manage this hospital's tickets",
-      });
-    }
 
     if (!ticket) {
       return res.status(404).json({
@@ -296,9 +274,16 @@ export const updateTicketStatus = async (req, res) => {
       });
     }
 
-    /* =======================
-       📝 PREPARE UPDATE DATA
-    ======================= */
+    if (
+      req.user.role === "Staff" &&
+      ticket.hospitalName !== req.user.assignedHospital
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized access",
+      });
+    }
+
     const updateData = {
       status,
       ...(notes && { notes }),
@@ -311,193 +296,62 @@ export const updateTicketStatus = async (req, res) => {
 
     if (status === "Completed") {
       updateData.completedAt = new Date();
-
-      // Safety: if Processing was skipped
       if (!ticket.processedBy) {
         updateData.processedBy = staffId;
         updateData.processedAt = new Date();
       }
     }
 
-    /* =======================
-       💾 UPDATE TICKET
-    ======================= */
-    const updatedTicket = await Ticket.findByIdAndUpdate(
-      ticketId,
-      updateData,
-      { new: true }
-    )
+    const updatedTicket = await Ticket.findByIdAndUpdate(ticketId, updateData, {
+      new: true,
+    })
       .populate("customer", "firstName lastName email fcmToken")
       .populate("processedBy", "firstName lastName");
 
-    console.log(
-      "✅ Ticket updated successfully:",
-      updatedTicket.ticketNumber
-    );
-
     /* =======================
-        🕒 SMART ARRIVAL WINDOW UPDATE
-      ======================= */
-
-      if (status === "Completed") {
-        const pendingTickets = await Ticket.find({
-          organization: updatedTicket.organization,
-          hospitalName: updatedTicket.hospitalName,
-          status: "Pending",
-        })
-          .sort({ queuePosition: 1 })
-          .populate("customer", "email");
-
-        const now = new Date();
-
-        for (const t of pendingTickets) {
-          const arrivalStart = new Date(
-            now.getTime() + (t.estimatedWaitTime - 10) * 60000
-          );
-
-          const arrivalEnd = new Date(
-            arrivalStart.getTime() + 15 * 60000
-          );
-
-          await Ticket.updateOne(
-            { _id: t._id },
-            {
-              arrivalWindow: {
-                start: arrivalStart,
-                end: arrivalEnd,
-              },
-            }
-          );
-        }
-      }
-
-      const ARRIVAL_ALERT_THRESHOLD = 20;
-
-      if (status === "Completed") {
-        const pendingTickets = await Ticket.find({
-          organization: updatedTicket.organization,
-          hospitalName: updatedTicket.hospitalName,
-          status: "Pending",
-          arrivalAlertSent: false,
-        })
-          .sort({ queuePosition: 1 })
-          .populate("customer", "email");
-
-        const now = new Date();
-
-        for (const t of pendingTickets) {
-          const minutesToArrival =
-            (t.arrivalWindow.start.getTime() - now.getTime()) / 60000;
-
-          if (minutesToArrival <= ARRIVAL_ALERT_THRESHOLD && t.customer?.email) {
-            await sendArrivalWindowEmail(t, t.customer);
-
-            await Ticket.updateOne(
-              { _id: t._id },
-              { arrivalAlertSent: true }
-            );
-
-            console.log(`🕒 Arrival email sent to ${t.customer.email}`);
-          }
-        }
-      }
-
-
-
-    /* =======================
-       🔔 PROCESSING STATUS
-    ======================= */
-    if (status === "Processing") {
-      // 📲 Push Notification
-      if (updatedTicket.customer?.fcmToken) {
-        await sendPushNotification({
-          token: updatedTicket.customer.fcmToken,
-          title: "⏳ Ticket Processing",
-          body: `Your ticket ${updatedTicket.ticketNumber} is now being processed.`,
-          data: {
-            ticketId: updatedTicket._id.toString(),
-            status: "Processing",
-          },
-        });
-      }
-
-      // 📧 Processing Started Email
-      if (updatedTicket.customer?.email) {
-        sendProcessingStartedEmail(
-          updatedTicket,
-          updatedTicket.customer
-        )
-          .then(() => console.log("📧 Processing email sent"))
-          .catch((err) =>
-            console.error("❌ Processing email failed:", err.message)
-          );
-      }
-
-      /* 🔔 TURN ALERT EMAILS (NEXT 3 USERS) */
-      
-    }
-
-    /* =======================
-       ✅ COMPLETED STATUS
+       🕒 ARRIVAL WINDOW UPDATE
     ======================= */
     if (status === "Completed") {
-      // 📲 Push Notification
-      if (updatedTicket.customer?.fcmToken) {
-        await sendPushNotification({
-          token: updatedTicket.customer.fcmToken,
-          title: "✅ Ticket Completed",
-          body: `Your ticket ${updatedTicket.ticketNumber} has been completed.`,
-          data: {
-            ticketId: updatedTicket._id.toString(),
-            status: "Completed",
-          },
-        });
-      }
-
-      // 📧 Completed Email
-      if (updatedTicket.customer?.email) {
-        sendCompletedEmail(updatedTicket, updatedTicket.customer)
-          .then(() => console.log("📧 Completed email sent"))
-          .catch((err) =>
-            console.error("❌ Completed email failed:", err.message)
-          );
-          const ALERT_THRESHOLD = 3;
-
-      const upcomingTickets = await Ticket.find({
+      const pendingTickets = await Ticket.find({
         organization: updatedTicket.organization,
         hospitalName: updatedTicket.hospitalName,
         status: "Pending",
-        turnAlertSent: false,
-      })
-        .sort({ queuePosition: 1 })
-        .limit(ALERT_THRESHOLD)
-        .populate("customer", "email");
+      }).sort({ queuePosition: 1 });
 
-      for (const t of upcomingTickets) {
-        if (t.customer?.email) {
-          await sendTurnAlertEmail(
-            t,
-            t.customer,
-            updatedTicket.ticketNumber
-          );
+      const now = new Date();
 
-          // Prevent duplicate alerts
-          await Ticket.updateOne(
-            { _id: t._id, turnAlertSent: false },
-            { $set: { turnAlertSent: true } }
-          );
+      for (const t of pendingTickets) {
+        const arrivalStart = new Date(
+          now.getTime() + (t.estimatedWaitTime - 10) * 60000
+        );
+        const arrivalEnd = new Date(arrivalStart.getTime() + 15 * 60000);
 
-          console.log(
-            `🔔 Turn alert email sent to ${t.customer.email}`
-          );
-        }
-      }
+        await Ticket.updateOne(
+          { _id: t._id },
+          { arrivalWindow: { start: arrivalStart, end: arrivalEnd } }
+        );
       }
     }
 
     /* =======================
-       ✅ RESPONSE
+       🔌 SOCKET.IO EVENTS
     ======================= */
+    const io = req.app.get("io");
+
+    // Notify customer
+    if (updatedTicket.customer?._id) {
+      io.to(updatedTicket.customer._id.toString()).emit(
+        "ticketUpdated",
+        updatedTicket
+      );
+    }
+
+    // Notify staff dashboards
+    io.emit("staffTicketUpdated", {
+      ticketId: updatedTicket._id,
+      status: updatedTicket.status,
+    });
+
     res.status(200).json({
       success: true,
       message: "Ticket status updated successfully",
@@ -517,40 +371,43 @@ export const getTicketById = async (req, res) => {
   try {
     const { ticketId } = req.params;
 
-    console.log('🔍 Fetching ticket by ID:', ticketId);
+    console.log("🔍 Fetching ticket by ID:", ticketId);
 
     const ticket = await Ticket.findById(ticketId)
-      .populate('customer', 'firstName lastName email phoneNumber')
-      .populate('processedBy', 'firstName lastName');
+      .populate("customer", "firstName lastName email phoneNumber")
+      .populate("processedBy", "firstName lastName");
 
     if (!ticket) {
-      console.log('❌ Ticket not found:', ticketId);
+      console.log("❌ Ticket not found:", ticketId);
       return res.status(404).json({
         success: false,
-        message: 'Ticket not found'
+        message: "Ticket not found",
       });
     }
 
     // Check if user has permission to view this ticket
-    if (req.user.role === 'Customer' && ticket.customer._id.toString() !== req.user._id.toString()) {
-      console.log('❌ Access denied for customer:', req.user._id);
+    if (
+      req.user.role === "Customer" &&
+      ticket.customer._id.toString() !== req.user._id.toString()
+    ) {
+      console.log("❌ Access denied for customer:", req.user._id);
       return res.status(403).json({
         success: false,
-        message: 'Access denied'
+        message: "Access denied",
       });
     }
 
-    console.log('✅ Ticket found:', ticket.ticketNumber);
+    console.log("✅ Ticket found:", ticket.ticketNumber);
 
     res.status(200).json({
       success: true,
-      data: { ticket }
+      data: { ticket },
     });
   } catch (error) {
-    console.error('❌ Get ticket by ID error:', error);
+    console.error("❌ Get ticket by ID error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to get ticket'
+      message: error.message || "Failed to get ticket",
     });
   }
 };
@@ -562,12 +419,12 @@ export const getPendingTicketsForPIT = async (req, res) => {
     const tickets = await Ticket.find({
       customer: customerId,
       status: "Pending",
-      "pit.generated": false
+      "pit.generated": false,
     }).sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
-      data: tickets
+      data: tickets,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -584,21 +441,27 @@ export const uploadDocuments = async (req, res) => {
     const ticket = await Ticket.findById(ticketId);
 
     if (!ticket) {
-      return res.status(404).json({ success: false, message: "Ticket not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Ticket not found" });
     }
 
     if (ticket.customer.toString() !== userId.toString()) {
-      return res.status(403).json({ success: false, message: "Not your ticket" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Not your ticket" });
     }
 
     if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: "No files uploaded" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No files uploaded" });
     }
 
-    const uploadedDocs = req.files.map(file => ({
+    const uploadedDocs = req.files.map((file) => ({
       fileName: file.originalname,
       fileUrl: `/uploads/${file.filename}`,
-      uploadedAt: new Date()
+      uploadedAt: new Date(),
     }));
 
     ticket.documents.push(...uploadedDocs);
@@ -607,7 +470,7 @@ export const uploadDocuments = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Documents uploaded successfully",
-      data: ticket.documents
+      data: ticket.documents,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -615,50 +478,49 @@ export const uploadDocuments = async (req, res) => {
 };
 
 export const getSortedQueue = async (req, res) => {
-    const { serviceType } = req.params;
+  const { serviceType } = req.params;
 
-    const tickets = await Ticket.find({
-        serviceType,
-        status: { $in: ["Pending", "Processing"] }
-    }).lean();
+  const tickets = await Ticket.find({
+    serviceType,
+    status: { $in: ["Pending", "Processing"] },
+  }).lean();
 
-    const sorted = reorderTickets(tickets);
+  const sorted = reorderTickets(tickets);
 
-    res.json({ success: true, tickets: sorted });
+  res.json({ success: true, tickets: sorted });
 };
-
 
 // Get ticket statistics
 export const getTicketStats = async (req, res) => {
   try {
-    console.log('📊 Fetching ticket statistics');
+    console.log("📊 Fetching ticket statistics");
 
     const stats = await Ticket.aggregate([
       {
         $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     const totalTickets = await Ticket.countDocuments();
     const todayTickets = await Ticket.countDocuments({
       createdAt: {
-        $gte: new Date(new Date().setHours(0, 0, 0, 0))
-      }
+        $gte: new Date(new Date().setHours(0, 0, 0, 0)),
+      },
     });
 
     const organizationStats = await Ticket.aggregate([
       {
         $group: {
-          _id: '$organization',
-          count: { $sum: 1 }
-        }
-      }
+          _id: "$organization",
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
-    console.log('✅ Statistics calculated successfully');
+    console.log("✅ Statistics calculated successfully");
 
     res.status(200).json({
       success: true,
@@ -666,14 +528,14 @@ export const getTicketStats = async (req, res) => {
         statusStats: stats,
         totalTickets,
         todayTickets,
-        organizationStats
-      }
+        organizationStats,
+      },
     });
   } catch (error) {
-    console.error('❌ Get ticket stats error:', error);
+    console.error("❌ Get ticket stats error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to get ticket statistics'
+      message: error.message || "Failed to get ticket statistics",
     });
   }
 };

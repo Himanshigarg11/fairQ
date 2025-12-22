@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Filter,
 } from "lucide-react";
+import { socket } from "../../socket";
 
 const CustomerDashboard = () => {
   const { user } = useAuth();
@@ -28,6 +29,18 @@ const CustomerDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const [ticketFilter, setTicketFilter] = useState("all");
+
+  useEffect(() => {
+    socket.on("ticketUpdated", (updatedTicket) => {
+      setTickets((prev) =>
+        prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t))
+      );
+    });
+
+    return () => {
+      socket.off("ticketUpdated");
+    };
+  }, []);
 
   useEffect(() => {
     fetchStats();
