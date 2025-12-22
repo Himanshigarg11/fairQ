@@ -3,6 +3,10 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
+    assignedHospital: {
+      type: String,
+      default: null, // required only for Staff
+    },
     username: {
       type: String,
       required: true,
@@ -49,6 +53,8 @@ notificationPreferences: {
     max: 10,
   },
 },
+
+
 
     isActive: { type: Boolean, default: true },
   },

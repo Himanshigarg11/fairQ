@@ -2,14 +2,26 @@ import React, { useState } from "react";
 import { bookTicket } from "../services/ticketService";
 import { TicketIcon, AlertTriangle, Loader2 } from "lucide-react";
 
+const HOSPITALS = [
+    "AIIMS Delhi",
+  "Fortis Hospital",
+  "Apollo Hospital",
+  "Max Healthcare"
+];
+
+
+
 const TicketBookingForm = ({ onTicketBooked }) => {
   const [formData, setFormData] = useState({
-    organization: "",
-    serviceType: "",
-    purpose: "",
-    priority: "Normal",
-    isEmergency: false,
-  });
+  organization: "",
+  hospitalName: "",
+  serviceType: "",
+  purpose: "",
+  priority: "Normal",
+  isEmergency: false,
+});
+
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -118,8 +130,14 @@ const TicketBookingForm = ({ onTicketBooked }) => {
       };
 
       if (name === "organization") {
-        updated = { ...updated, organization: value, serviceType: "" };
-      }
+  updated = {
+    ...updated,
+    organization: value,
+    serviceType: "",
+    hospitalName: value === "Hospital" ? updated.hospitalName : "",
+  };
+}
+
 
       if (name === "isEmergency") {
         updated = {
@@ -147,12 +165,14 @@ const TicketBookingForm = ({ onTicketBooked }) => {
         `Ticket booked successfully! Ticket Number: ${response.data.ticket.ticketNumber}`
       );
       setFormData({
-        organization: "",
-        serviceType: "",
-        purpose: "",
-        priority: "Normal",
-        isEmergency: false,
-      });
+  organization: "",
+  hospitalName: "",
+  serviceType: "",
+  purpose: "",
+  priority: "Normal",
+  isEmergency: false,
+});
+
 
       if (onTicketBooked) {
         onTicketBooked(response.data.ticket);
@@ -205,7 +225,27 @@ const TicketBookingForm = ({ onTicketBooked }) => {
               </option>
             ))}
           </select>
+
         </div>
+        {formData.organization === "Hospital" && (  <div>
+    <label className="block text-sm font-medium mb-1">
+      Select Hospital *
+    </label>
+    <select
+  name="hospitalName"
+  value={formData.hospitalName}
+  onChange={handleChange}
+  className="w-full px-4 py-2 border rounded-lg"
+  required
+>
+
+      <option value="">Choose Hospital</option>
+      {HOSPITALS.map((h) => (
+        <option key={h} value={h}>{h}</option>
+      ))}
+    </select>
+  </div>
+)}
 
         {/* Service Type Selection */}
         {formData.organization && (

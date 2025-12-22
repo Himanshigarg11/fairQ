@@ -6,10 +6,9 @@ import {
   sendTicketBookedEmail,
   sendProcessingStartedEmail,
   sendCompletedEmail,
-  sendTurnAlertEmail
+  sendTurnAlertEmail,
+  sendArrivalWindowEmail
 } from "../services/emailService.js";
-
-
 
 
 export const requiredDocsList = {
@@ -50,7 +49,14 @@ export const bookTicket = async (req, res) => {
   try {
     console.log('📝 Book ticket request received:', req.body);
     
-    const { organization, serviceType, purpose, priority, isEmergency } = req.body;
+    const {
+      organization,
+      hospitalName,
+      serviceType,
+      purpose,
+      priority,
+      isEmergency
+    } = req.body;
     const customerId = req.user._id;
 
     // Validation
@@ -62,6 +68,14 @@ export const bookTicket = async (req, res) => {
       });
     }
 
+    if (organization === "Hospital" && !hospitalName) {
+      return res.status(400).json({
+        success: false,
+        message: "Hospital selection is required",
+      });
+    }
+
+
     console.log('✅ Validation passed');
 
     // Generate unique ticket number
@@ -71,11 +85,22 @@ export const bookTicket = async (req, res) => {
     // Get current queue position
     const pendingTickets = await Ticket.countDocuments({
       organization,
+      hospitalName,
       status: { $in: ['Pending', 'Processing'] }
     });
 
+
     const queuePosition = pendingTickets + 1;
     const estimatedWaitTime = queuePosition * 15; // 15 minutes per person
+    const now = new Date();
+
+    const arrivalStart = new Date(
+      now.getTime() + (estimatedWaitTime - 10) * 60000
+    );
+
+    const arrivalEnd = new Date(
+      arrivalStart.getTime() + 15 * 60000
+    );
 
     console.log('📊 Queue info:', { queuePosition, estimatedWaitTime });
 
@@ -84,12 +109,17 @@ export const bookTicket = async (req, res) => {
       ticketNumber, // Explicitly set ticket number
       customer: customerId,
       organization,
+      hospitalName,
       serviceType,
       purpose,
       priority: {
       emergency: isEmergency === true,
       elderly: priority === "Elderly",
       prepared: false // becomes true only after PIT scan
+      },
+      arrivalWindow: {
+        start: arrivalStart,
+        end: arrivalEnd,
       },
       isEmergency,
       queuePosition,
@@ -192,8 +222,15 @@ export const getAllTickets = async (req, res) => {
     console.log('📋 Fetching all tickets with filters:', { status, organization });
     
     const filter = {};
+
+    if (req.user.role === "Staff") {
+      filter.organization = "Hospital";
+      filter.hospitalName = req.user.assignedHospital;
+    } else {
+      if (organization) filter.organization = organization;
+    }
+
     if (status) filter.status = status;
-    if (organization) filter.organization = organization;
 
     const tickets = await Ticket.find(filter)
       .populate('customer', 'firstName lastName email phoneNumber')
@@ -242,6 +279,16 @@ export const updateTicketStatus = async (req, res) => {
        🔍 FETCH TICKET
     ======================= */
     const ticket = await Ticket.findById(ticketId);
+    if (
+      req.user.role === "Staff" &&
+      ticket.hospitalName !== req.user.assignedHospital
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to manage this hospital's tickets",
+      });
+    }
+
     if (!ticket) {
       return res.status(404).json({
         success: false,
@@ -287,6 +334,75 @@ export const updateTicketStatus = async (req, res) => {
       "✅ Ticket updated successfully:",
       updatedTicket.ticketNumber
     );
+
+    /* =======================
+        🕒 SMART ARRIVAL WINDOW UPDATE
+      ======================= */
+
+      if (status === "Completed") {
+        const pendingTickets = await Ticket.find({
+          organization: updatedTicket.organization,
+          hospitalName: updatedTicket.hospitalName,
+          status: "Pending",
+        })
+          .sort({ queuePosition: 1 })
+          .populate("customer", "email");
+
+        const now = new Date();
+
+        for (const t of pendingTickets) {
+          const arrivalStart = new Date(
+            now.getTime() + (t.estimatedWaitTime - 10) * 60000
+          );
+
+          const arrivalEnd = new Date(
+            arrivalStart.getTime() + 15 * 60000
+          );
+
+          await Ticket.updateOne(
+            { _id: t._id },
+            {
+              arrivalWindow: {
+                start: arrivalStart,
+                end: arrivalEnd,
+              },
+            }
+          );
+        }
+      }
+
+      const ARRIVAL_ALERT_THRESHOLD = 20;
+
+      if (status === "Completed") {
+        const pendingTickets = await Ticket.find({
+          organization: updatedTicket.organization,
+          hospitalName: updatedTicket.hospitalName,
+          status: "Pending",
+          arrivalAlertSent: false,
+        })
+          .sort({ queuePosition: 1 })
+          .populate("customer", "email");
+
+        const now = new Date();
+
+        for (const t of pendingTickets) {
+          const minutesToArrival =
+            (t.arrivalWindow.start.getTime() - now.getTime()) / 60000;
+
+          if (minutesToArrival <= ARRIVAL_ALERT_THRESHOLD && t.customer?.email) {
+            await sendArrivalWindowEmail(t, t.customer);
+
+            await Ticket.updateOne(
+              { _id: t._id },
+              { arrivalAlertSent: true }
+            );
+
+            console.log(`🕒 Arrival email sent to ${t.customer.email}`);
+          }
+        }
+      }
+
+
 
     /* =======================
        🔔 PROCESSING STATUS
@@ -349,6 +465,7 @@ export const updateTicketStatus = async (req, res) => {
 
       const upcomingTickets = await Ticket.find({
         organization: updatedTicket.organization,
+        hospitalName: updatedTicket.hospitalName,
         status: "Pending",
         turnAlertSent: false,
       })

@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const HOSPITALS = [
+  "AIIMS Delhi",
+  "Fortis Hospital",
+  "Apollo Hospital",
+  "Max Healthcare"
+];
+
+
 const Register = () => {
   const { register, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
@@ -14,6 +22,7 @@ const Register = () => {
     phoneNumber: '',
     role: 'Customer'
   });
+const [assignedHospital, setAssignedHospital] = useState("");
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -23,7 +32,12 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const user = await register(formData);
+      const payload = {
+  ...formData,
+  ...(formData.role === "Staff" && { assignedHospital }),
+};
+
+const user = await register(payload);
       const dashboardRoute = user.role === 'Customer' ? '/customer/dashboard' :
                            user.role === 'Staff' ? '/staff/dashboard' :
                            user.role === 'Admin' ? '/admin/dashboard' : '/';
@@ -164,6 +178,26 @@ const Register = () => {
                     <option value="Staff">Staff</option>
                     <option value="Admin">Admin</option>
                   </select>
+                  {formData.role === "Staff" && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Assigned Hospital
+                    </label>
+                    <select
+                      value={assignedHospital}
+                      onChange={(e) => setAssignedHospital(e.target.value)}
+                      required
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    >
+                      <option value="">Select Hospital</option>
+                      {HOSPITALS.map((hospital) => (
+                        <option key={hospital} value={hospital}>
+                          {hospital}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 </div>
               </div>
               

@@ -56,6 +56,19 @@ const ticketSchema = new mongoose.Schema({
     required: true,
     enum: ['Hospital', 'Bank', 'Government Office', 'Restaurant', 'Airport', 'DMV', 'Post Office', 'Telecom Office']
   },
+  arrivalWindow: {
+    start: { type: Date },
+    end: { type: Date },
+  },
+  arrivalAlertSent: {
+    type: Boolean,
+    default: false,
+  },
+
+  hospitalName: {
+      type: String,
+      required: true,
+    },
   serviceType: {
     type: String,
     required: true
@@ -114,6 +127,11 @@ turnAlertSent: {
     type: String,
     default: ''
   },
+  arrivalAlertSent: {
+  type: Boolean,
+  default: false,
+},
+
   requiredDocuments: {
   type: [String],
   default: []

@@ -4,11 +4,27 @@ import { generateToken } from '../utils/generateToken.js';
 // Register user
 export const register = async (req, res) => {
   try {
-    const { username, email, password, firstName, lastName, phoneNumber, role } = req.body;
+    const {
+    username,
+    email,
+    password,
+    firstName,
+    lastName,
+    phoneNumber,
+    role,
+    assignedHospital
+} = req.body;
 
     if (!username || !email || !password || !firstName || !lastName) {
       return res.status(400).json({ success: false, message: 'All required fields must be provided' });
     }
+    if (role === "Staff" && !assignedHospital) {
+      return res.status(400).json({
+        success: false,
+        message: "Staff must be assigned to a hospital",
+      });
+    }
+
 
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) return res.status(400).json({ success: false, message: 'User already exists' });
@@ -20,8 +36,10 @@ export const register = async (req, res) => {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       phoneNumber: phoneNumber?.trim() || '',
-      role: role || 'Customer'
+      role: role || 'Customer',
+      assignedHospital: role === "Staff" ? assignedHospital : null,
     });
+
 
     const token = generateToken({ userId: user._id, role: user.role });
 
@@ -35,7 +53,8 @@ export const register = async (req, res) => {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.role
+          role: user.role,
+          assignedHospital: user.assignedHospital
         },
         token
       }
@@ -71,7 +90,8 @@ export const login = async (req, res) => {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.role
+          role: user.role,
+          assignedHospital: user.assignedHospital
         },
         token
       }
@@ -96,7 +116,8 @@ export const getProfile = async (req, res) => {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.role
+          role: user.role,
+          assignedHospital: user.assignedHospital
         }
       }
     });

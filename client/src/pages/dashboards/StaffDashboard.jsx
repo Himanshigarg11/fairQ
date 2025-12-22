@@ -33,7 +33,6 @@ const StaffDashboard = () => {
   const [allTickets, setAllTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Pending");
-  const [organization, setOrganization] = useState("All");
   const [success, setSuccess] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -43,31 +42,26 @@ const StaffDashboard = () => {
     return () => clearInterval(id);
   }, []);
 
-  // Load ALL tickets once
-  useEffect(() => {
-    const loadAll = async () => {
-      try {
-        const res = await getAllTickets();
-        setAllTickets(res.data.tickets || []);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    loadAll();
-  }, []);
-
   // Load tickets by status
-  const fetchTickets = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await getAllTickets({ status: filter });
-      setTickets(res.data.tickets || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+const fetchTickets = useCallback(async () => {
+  if (!user?.assignedHospital) return;
+
+  try {
+    setLoading(true);
+    const res = await getAllTickets({
+      status: filter,
+      organization: user.assignedHospital,
+    });
+
+    setTickets(res.data.tickets || []);
+    setAllTickets(res.data.tickets || []);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}, [filter, user]);
+
 
   useEffect(() => {
     fetchTickets();
@@ -117,15 +111,12 @@ const StaffDashboard = () => {
   };
 
   // Filter + sort
-  const visibleTickets = tickets
-    .filter((t) =>
-      organization === "All" ? true : t.organization === organization
-    )
-    .sort(
-      (a, b) =>
-        priorityRank[normalizePriority(a.priority)] -
-        priorityRank[normalizePriority(b.priority)]
-    );
+const visibleTickets = tickets.sort(
+  (a, b) =>
+    priorityRank[normalizePriority(a.priority)] -
+    priorityRank[normalizePriority(b.priority)]
+);
+
 
   // Stats
   const stats = {
@@ -178,6 +169,14 @@ const StaffDashboard = () => {
                 <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
                   Staff Dashboard
                 </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  Managing Hospital:{" "}
+                  <span className="font-medium text-slate-700">
+                    {user?.assignedHospital || "Not Assigned"}
+                  </span>
+                </p>
+
+                
                 <p className="text-sm text-slate-600">
                   Welcome,{" "}
                   <span className="font-semibold text-slate-900">
@@ -303,20 +302,7 @@ const StaffDashboard = () => {
             </span>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <select
-              value={organization}
-              onChange={(e) => setOrganization(e.target.value)}
-              className="border border-slate-300 bg-white px-3 py-2 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-            >
-              <option value="All">All Organizations</option>
-              {[...new Set(allTickets.map((t) => t.organization))].map(
-                (org) => (
-                  <option key={org} value={org}>
-                    {org}
-                  </option>
-                )
-              )}
-            </select>
+
 
             <select
               value={filter}

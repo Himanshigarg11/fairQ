@@ -75,4 +75,23 @@ export const sendCompletedEmail = async (ticket, user) => {
   });
 };
 
+export const sendArrivalWindowEmail = async (ticket, user) => {
+  await sendEmail({
+    to: user.email,
+    subject: "🕒 Your Arrival Time for FairQ",
+    html: `
+      <h2>Your Arrival Window Is Ready</h2>
+      <p><strong>Ticket Number:</strong> ${ticket.ticketNumber}</p>
+      <p>Please arrive between:</p>
+      <h3>
+        ${new Date(ticket.arrivalWindow.start).toLocaleTimeString()} –
+        ${new Date(ticket.arrivalWindow.end).toLocaleTimeString()}
+      </h3>
+      <p>This helps reduce waiting and crowding.</p>
+      <p>Thank you for using FairQ.</p>
+    `,
+  });
+};
+
+
 export default sendEmail;
