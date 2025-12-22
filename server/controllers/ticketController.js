@@ -302,11 +302,54 @@ export const updateTicketStatus = async (req, res) => {
       }
     }
 
-    const updatedTicket = await Ticket.findByIdAndUpdate(ticketId, updateData, {
-      new: true,
-    })
-      .populate("customer", "firstName lastName email fcmToken")
-      .populate("processedBy", "firstName lastName");
+  const updatedTicket = await Ticket.findByIdAndUpdate(
+  ticketId,
+  updateData,
+  { new: true }
+)
+  .populate(
+    "customer",
+    "firstName lastName email fcmToken notificationPreferences"
+  )
+  .populate("processedBy", "firstName lastName");
+
+/* =======================
+   📧 EMAIL NOTIFICATIONS
+======================= */
+
+// ✅ PROCESSING EMAIL
+if (
+  status === "Processing" &&
+  updatedTicket.customer?.email &&
+  updatedTicket.customer.notificationPreferences?.emailEnabled
+) {
+  try {
+    await sendProcessingStartedEmail(
+      updatedTicket,
+      updatedTicket.customer
+    );
+    console.log("📧 Processing email sent");
+  } catch (err) {
+    console.error("❌ Processing email failed:", err.message);
+  }
+}
+
+// ✅ COMPLETED EMAIL
+if (
+  status === "Completed" &&
+  updatedTicket.customer?.email &&
+  updatedTicket.customer.notificationPreferences?.emailEnabled
+) {
+  try {
+    await sendCompletedEmail(
+      updatedTicket,
+      updatedTicket.customer
+    );
+    console.log("📧 Completed email sent");
+  } catch (err) {
+    console.error("❌ Completed email failed:", err.message);
+  }
+}
 
     /* =======================
        🕒 ARRIVAL WINDOW UPDATE

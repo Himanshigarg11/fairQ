@@ -66,9 +66,12 @@ const ticketSchema = new mongoose.Schema({
   },
 
   hospitalName: {
-      type: String,
-      required: true,
-    },
+  type: String,
+  required: function () {
+    return this.organization === "Hospital";
+  },
+},
+
   serviceType: {
     type: String,
     required: true
@@ -105,6 +108,22 @@ turnAlertSent: {
   type: Boolean,
   default: false
 },
+// 🔔 Push notification flags (prevents duplicate Firebase pushes)
+pushNotifications: {
+  bookedSent: {
+    type: Boolean,
+    default: false
+  },
+  processingSent: {
+    type: Boolean,
+    default: false
+  },
+  completedSent: {
+    type: Boolean,
+    default: false
+  }
+},
+
 
   bookedAt: {
     type: Date,
@@ -127,10 +146,6 @@ turnAlertSent: {
     type: String,
     default: ''
   },
-  arrivalAlertSent: {
-  type: Boolean,
-  default: false,
-},
 
   requiredDocuments: {
   type: [String],
