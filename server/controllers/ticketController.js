@@ -2,6 +2,14 @@ import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
 import { sendPushNotification } from "../services/notificationService.js";
 import { reorderTickets } from "../utils/reorderQueue.js";
+import {
+  sendTicketBookedEmail,
+  sendProcessingStartedEmail,
+  sendCompletedEmail,
+  sendTurnAlertEmail
+} from "../services/emailService.js";
+
+
 
 
 export const requiredDocsList = {
@@ -105,7 +113,15 @@ await sendPushNotification({
 });
 
     // TODO: Send email notification
-    console.log(`📧 Email notification: Ticket ${ticket.ticketNumber} booked for ${ticket.customer.email}`);
+    // 📧 Email notification: Ticket Booked
+sendTicketBookedEmail(ticket, ticket.customer)
+  .then(() => {
+    console.log(`📧 Ticket booked email sent to ${ticket.customer.email}`);
+  })
+  .catch((err) => {
+    console.error("❌ Failed to send ticket booked email:", err.message);
+  });
+
 
     res.status(201).json({
       success: true,
@@ -194,78 +210,172 @@ export const updateTicketStatus = async (req, res) => {
     const { status, notes } = req.body;
     const staffId = req.user._id;
 
-    console.log('🔄 Updating ticket status:', { ticketId, status, notes });
-
-    const ticket = await Ticket.findById(ticketId);
-    if (!ticket) {
-      console.log('❌ Ticket not found:', ticketId);
-      return res.status(404).json({
+    /* =======================
+       ✅ STATUS VALIDATION
+    ======================= */
+    const ALLOWED_STATUSES = ["Pending", "Processing", "Completed"];
+    if (!ALLOWED_STATUSES.includes(status)) {
+      return res.status(400).json({
         success: false,
-        message: 'Ticket not found'
+        message: "Invalid ticket status",
       });
     }
 
-    // Update ticket
-    const updateData = { status };
-    if (notes) updateData.notes = notes;
+    console.log("🔄 Updating ticket status:", { ticketId, status, notes });
 
-    if (status === 'Processing') {
+    /* =======================
+       🔍 FETCH TICKET
+    ======================= */
+    const ticket = await Ticket.findById(ticketId);
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+    }
+
+    /* =======================
+       📝 PREPARE UPDATE DATA
+    ======================= */
+    const updateData = {
+      status,
+      ...(notes && { notes }),
+    };
+
+    if (status === "Processing") {
       updateData.processedAt = new Date();
       updateData.processedBy = staffId;
-    } else if (status === 'Completed') {
+    }
+
+    if (status === "Completed") {
       updateData.completedAt = new Date();
+
+      // Safety: if Processing was skipped
       if (!ticket.processedBy) {
         updateData.processedBy = staffId;
         updateData.processedAt = new Date();
       }
     }
 
+    /* =======================
+       💾 UPDATE TICKET
+    ======================= */
     const updatedTicket = await Ticket.findByIdAndUpdate(
       ticketId,
       updateData,
       { new: true }
-    ).populate('customer', 'firstName lastName email fcmToken')
-.populate('processedBy', 'firstName lastName');
+    )
+      .populate("customer", "firstName lastName email fcmToken")
+      .populate("processedBy", "firstName lastName");
 
-    console.log('✅ Ticket updated successfully:', updatedTicket.ticketNumber);
-     // 🔔 Push notifications for status updates
-if (status === "Processing") {
-  await sendPushNotification({
-    token: updatedTicket.customer.fcmToken,
-    title: "⏳ Ticket Processing",
-    body: `Your ticket ${updatedTicket.ticketNumber} is now being processed.`,
-    data: {
-      ticketId: updatedTicket._id.toString(),
-      status: "Processing",
-    },
-  });
-}
+    console.log(
+      "✅ Ticket updated successfully:",
+      updatedTicket.ticketNumber
+    );
 
-if (status === "Completed") {
-  await sendPushNotification({
-    token: updatedTicket.customer?.fcmToken,
-    title: "✅ Ticket Completed",
-    body: `Your ticket ${updatedTicket.ticketNumber} has been completed.`,
-    data: {
-      ticketId: updatedTicket._id.toString(),
-      status: "Completed",
-    },
-  });
-}
+    /* =======================
+       🔔 PROCESSING STATUS
+    ======================= */
+    if (status === "Processing") {
+      // 📲 Push Notification
+      if (updatedTicket.customer?.fcmToken) {
+        await sendPushNotification({
+          token: updatedTicket.customer.fcmToken,
+          title: "⏳ Ticket Processing",
+          body: `Your ticket ${updatedTicket.ticketNumber} is now being processed.`,
+          data: {
+            ticketId: updatedTicket._id.toString(),
+            status: "Processing",
+          },
+        });
+      }
 
-    // TODO: Send status update email
-    console.log(`📧 Status update email: Ticket ${updatedTicket.ticketNumber} is now ${status}`);
+      // 📧 Processing Started Email
+      if (updatedTicket.customer?.email) {
+        sendProcessingStartedEmail(
+          updatedTicket,
+          updatedTicket.customer
+        )
+          .then(() => console.log("📧 Processing email sent"))
+          .catch((err) =>
+            console.error("❌ Processing email failed:", err.message)
+          );
+      }
 
+      /* 🔔 TURN ALERT EMAILS (NEXT 3 USERS) */
+      
+    }
+
+    /* =======================
+       ✅ COMPLETED STATUS
+    ======================= */
+    if (status === "Completed") {
+      // 📲 Push Notification
+      if (updatedTicket.customer?.fcmToken) {
+        await sendPushNotification({
+          token: updatedTicket.customer.fcmToken,
+          title: "✅ Ticket Completed",
+          body: `Your ticket ${updatedTicket.ticketNumber} has been completed.`,
+          data: {
+            ticketId: updatedTicket._id.toString(),
+            status: "Completed",
+          },
+        });
+      }
+
+      // 📧 Completed Email
+      if (updatedTicket.customer?.email) {
+        sendCompletedEmail(updatedTicket, updatedTicket.customer)
+          .then(() => console.log("📧 Completed email sent"))
+          .catch((err) =>
+            console.error("❌ Completed email failed:", err.message)
+          );
+          const ALERT_THRESHOLD = 3;
+
+      const upcomingTickets = await Ticket.find({
+        organization: updatedTicket.organization,
+        status: "Pending",
+        turnAlertSent: false,
+      })
+        .sort({ queuePosition: 1 })
+        .limit(ALERT_THRESHOLD)
+        .populate("customer", "email");
+
+      for (const t of upcomingTickets) {
+        if (t.customer?.email) {
+          await sendTurnAlertEmail(
+            t,
+            t.customer,
+            updatedTicket.ticketNumber
+          );
+
+          // Prevent duplicate alerts
+          await Ticket.updateOne(
+            { _id: t._id, turnAlertSent: false },
+            { $set: { turnAlertSent: true } }
+          );
+
+          console.log(
+            `🔔 Turn alert email sent to ${t.customer.email}`
+          );
+        }
+      }
+      }
+    }
+
+    /* =======================
+       ✅ RESPONSE
+    ======================= */
     res.status(200).json({
       success: true,
-      message: 'Ticket status updated successfully',
-      data: { ticket: updatedTicket }
+      message: "Ticket status updated successfully",
+      data: { ticket: updatedTicket },
     });
   } catch (error) {
-    console.error('❌ Update ticket status error:', error);
+    console.error("❌ Update ticket status error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to update ticket status'
+      message: error.message || "Failed to update ticket status",
     });
   }
 };

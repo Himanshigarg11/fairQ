@@ -87,6 +87,12 @@ const ticketSchema = new mongoose.Schema({
     type: Number, // in minutes
     default: null
   },
+  // 🔔 Turn alert email flag (prevents duplicate emails)
+turnAlertSent: {
+  type: Boolean,
+  default: false
+},
+
   bookedAt: {
     type: Date,
     default: Date.now
