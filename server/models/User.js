@@ -33,6 +33,22 @@ const userSchema = new mongoose.Schema(
   type: String,
   default: null,
 },
+notificationPreferences: {
+  emailEnabled: {
+    type: Boolean,
+    default: true,
+  },
+  pushEnabled: {
+    type: Boolean,
+    default: true,
+  },
+  turnAlertThreshold: {
+    type: Number,
+    default: 3,
+    min: 1,
+    max: 10,
+  },
+},
 
     isActive: { type: Boolean, default: true },
   },

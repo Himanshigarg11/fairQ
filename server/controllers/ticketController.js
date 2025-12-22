@@ -98,29 +98,44 @@ export const bookTicket = async (req, res) => {
 
     console.log('✅ Ticket created successfully:', ticket._id);
 
-    await ticket.populate('customer', 'firstName lastName email fcmToken')
+   await ticket.populate(
+  'customer',
+  'firstName lastName email fcmToken notificationPreferences'
+);
 
-    
-    // 🔔 Push notification: Ticket Booked
-await sendPushNotification({
-  token: ticket.customer.fcmToken,
-  title: "🎟 Ticket Booked",
-  body: `Your ticket ${ticket.ticketNumber} has been booked successfully.`,
-  data: {
-    ticketId: ticket._id.toString(),
-    status: "Pending",
-  },
-});
+if (
+  ticket.customer?.fcmToken &&
+  ticket.customer.notificationPreferences?.pushEnabled
+) {
+  await sendPushNotification({
+    token: ticket.customer.fcmToken,
+    title: "🎟 Ticket Booked",
+    body: `Your ticket ${ticket.ticketNumber} has been booked successfully.`,
+    data: {
+      ticketId: ticket._id.toString(),
+      status: "Pending",
+    },
+  });
+}
 
     // TODO: Send email notification
-    // 📧 Email notification: Ticket Booked
-sendTicketBookedEmail(ticket, ticket.customer)
-  .then(() => {
-    console.log(`📧 Ticket booked email sent to ${ticket.customer.email}`);
-  })
-  .catch((err) => {
-    console.error("❌ Failed to send ticket booked email:", err.message);
-  });
+if (
+  ticket.customer?.email &&
+  ticket.customer.notificationPreferences?.emailEnabled
+) {
+  sendTicketBookedEmail(ticket, ticket.customer)
+    .then(() => {
+      console.log(
+        `📧 Ticket booked email sent to ${ticket.customer.email}`
+      );
+    })
+    .catch((err) => {
+      console.error(
+        "❌ Failed to send ticket booked email:",
+        err.message
+      );
+    });
+}
 
 
     res.status(201).json({
