@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { ORGANIZATION_UNITS } from "../constants/organizationUnits.js";
 
-const HOSPITALS = [
-  "AIIMS Delhi",
-  "Fortis Hospital",
-  "Apollo Hospital",
-  "Max Healthcare"
-];
+
 
 
 const Register = () => {
@@ -22,7 +18,9 @@ const Register = () => {
     phoneNumber: '',
     role: 'Customer'
   });
-const [assignedHospital, setAssignedHospital] = useState("");
+const [organization, setOrganization] = useState("");
+const [organizationUnit, setOrganizationUnit] = useState("");
+
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -32,9 +30,12 @@ const [assignedHospital, setAssignedHospital] = useState("");
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const payload = {
+     const payload = {
   ...formData,
-  ...(formData.role === "Staff" && { assignedHospital }),
+  ...(formData.role === "Staff" && {
+    organization,
+    organizationUnit,
+  }),
 };
 
 const user = await register(payload);
@@ -179,25 +180,54 @@ const user = await register(payload);
                     <option value="Admin">Admin</option>
                   </select>
                   {formData.role === "Staff" && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Assigned Hospital
-                    </label>
-                    <select
-                      value={assignedHospital}
-                      onChange={(e) => setAssignedHospital(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                    >
-                      <option value="">Select Hospital</option>
-                      {HOSPITALS.map((hospital) => (
-                        <option key={hospital} value={hospital}>
-                          {hospital}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+  <div className="space-y-4">
+    {/* Organization */}
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        Organization
+      </label>
+      <select
+        value={organization}
+        onChange={(e) => {
+          setOrganization(e.target.value);
+          setOrganizationUnit("");
+        }}
+        required
+        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 bg-gray-50"
+      >
+        <option value="">Select Organization</option>
+        {Object.keys(ORGANIZATION_UNITS).map((org) => (
+          <option key={org} value={org}>
+            {org}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Organization Unit */}
+    {organization && (
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          Organization Unit
+        </label>
+        <select
+          value={organizationUnit}
+          onChange={(e) => setOrganizationUnit(e.target.value)}
+          required
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 bg-gray-50"
+        >
+          <option value="">Select Unit</option>
+          {ORGANIZATION_UNITS[organization].map((unit) => (
+            <option key={unit} value={unit}>
+              {unit}
+            </option>
+          ))}
+        </select>
+      </div>
+    )}
+  </div>
+)}
+
                 </div>
               </div>
               

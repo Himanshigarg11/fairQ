@@ -56,6 +56,11 @@ const ticketSchema = new mongoose.Schema({
     required: true,
     enum: ['Hospital', 'Bank', 'Government Office', 'Restaurant', 'Airport', 'DMV', 'Post Office', 'Telecom Office']
   },
+  organizationUnit: {
+  type: String,
+  required: true,
+},
+
   arrivalWindow: {
     start: { type: Date },
     end: { type: Date },
@@ -65,12 +70,7 @@ const ticketSchema = new mongoose.Schema({
     default: false,
   },
 
-  hospitalName: {
-  type: String,
-  required: function () {
-    return this.organization === "Hospital";
-  },
-},
+
 
   serviceType: {
     type: String,

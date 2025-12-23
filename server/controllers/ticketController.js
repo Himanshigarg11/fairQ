@@ -1,7 +1,8 @@
 import Ticket from "../models/Ticket.js";
-import User from "../models/User.js";
 import { sendPushNotification } from "../services/notificationService.js";
 import { reorderTickets } from "../utils/reorderQueue.js";
+import { ORGANIZATION_UNITS } from "../constants/organizationUnits.js";
+
 import {
   sendTicketBookedEmail,
   sendProcessingStartedEmail,
@@ -52,7 +53,7 @@ export const bookTicket = async (req, res) => {
 
     const {
       organization,
-      hospitalName,
+      organizationUnit,
       serviceType,
       purpose,
       priority,
@@ -69,12 +70,16 @@ export const bookTicket = async (req, res) => {
       });
     }
 
-    if (organization === "Hospital" && !hospitalName) {
-      return res.status(400).json({
-        success: false,
-        message: "Hospital selection is required",
-      });
-    }
+  if (
+  !ORGANIZATION_UNITS[organization] ||
+  !ORGANIZATION_UNITS[organization].includes(organizationUnit)
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Invalid organization unit selected",
+  });
+}
+
 
     console.log("✅ Validation passed");
 
@@ -85,7 +90,7 @@ export const bookTicket = async (req, res) => {
     // Get current queue position
     const pendingTickets = await Ticket.countDocuments({
       organization,
-      hospitalName,
+      organizationUnit,
       status: { $in: ["Pending", "Processing"] },
     });
 
@@ -106,7 +111,7 @@ export const bookTicket = async (req, res) => {
       ticketNumber, // Explicitly set ticket number
       customer: customerId,
       organization,
-      hospitalName,
+      organizationUnit,
       serviceType,
       purpose,
       priority: {
@@ -220,11 +225,10 @@ export const getAllTickets = async (req, res) => {
     const filter = {};
 
     if (req.user.role === "Staff") {
-      filter.organization = "Hospital";
-      filter.hospitalName = req.user.assignedHospital;
-    } else {
-      if (organization) filter.organization = organization;
-    }
+  filter.organization = req.user.organization;
+} else {
+  if (organization) filter.organization = organization;
+}
 
     if (status) filter.status = status;
 
@@ -232,7 +236,7 @@ export const getAllTickets = async (req, res) => {
       .populate("customer", "firstName lastName email phoneNumber")
       .populate("processedBy", "firstName lastName")
       .sort({
-        priority: -1, // Emergency first
+        "priority.emergency": -1, // Emergency first
         createdAt: 1, // Then by booking time
       });
 
@@ -273,16 +277,17 @@ export const updateTicketStatus = async (req, res) => {
         message: "Ticket not found",
       });
     }
+if (
+  req.user.role === "Staff" &&
+  ticket.organization !== req.user.organization
+   
+) {
+  return res.status(403).json({
+    success: false,
+    message: "Unauthorized access",
+  });
+}
 
-    if (
-      req.user.role === "Staff" &&
-      ticket.hospitalName !== req.user.assignedHospital
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized access",
-      });
-    }
 
     const updateData = {
       status,
@@ -357,7 +362,7 @@ if (
     if (status === "Completed") {
       const pendingTickets = await Ticket.find({
         organization: updatedTicket.organization,
-        hospitalName: updatedTicket.hospitalName,
+        organizationUnit: updatedTicket.organizationUnit,
         status: "Pending",
       }).sort({ queuePosition: 1 });
 

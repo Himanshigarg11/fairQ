@@ -34,16 +34,17 @@ export const Navbar = () => {
                 {/* User Info */}
                 <div className="flex items-center space-x-2 bg-orange-50/90 px-3 py-1.5 rounded-full border border-orange-100 shadow-sm">
                   <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center shadow-sm">
-                    <span className="text-white text-xs font-bold">
-                      {user.firstName.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <span className="hidden sm:inline text-xs sm:text-sm text-slate-700 font-medium">
-                    Welcome, {user.firstName}!
-                  </span>
-                  <span className="sm:hidden text-xs text-slate-700 font-medium">
-                    {user.firstName}
-                  </span>
+  <span className="text-white text-xs font-bold">
+    {user?.firstName?.charAt(0).toUpperCase() || "U"}
+  </span>
+</div>
+<span className="hidden sm:inline text-xs sm:text-sm text-slate-700 font-medium">
+  Welcome, {user?.firstName || "User"}!
+</span>
+<span className="sm:hidden text-xs text-slate-700 font-medium">
+  {user?.firstName || "User"}
+</span>
+
                 </div>
 
                 {/* Dashboard Button */}

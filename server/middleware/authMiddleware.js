@@ -14,7 +14,10 @@ export const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = verifyToken(token);
 
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).select(
+  "_id role organization organizationUnit notificationPreferences isActive"
+);
+
     if (!user || !user.isActive) {
       return res.status(401).json({ 
         success: false, 

@@ -3,10 +3,7 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
-    assignedHospital: {
-      type: String,
-      default: null, // required only for Staff
-    },
+   
     username: {
       type: String,
       required: true,
@@ -22,6 +19,30 @@ const userSchema = new mongoose.Schema(
       enum: ["Customer", "Staff", "Admin"],
       default: "Customer",
     },
+    organization: {
+  type: String,
+  enum: [
+    "Hospital",
+    "Bank",
+    "Government Office",
+    "Restaurant",
+    "Airport",
+    "DMV",
+    "Post Office",
+    "Telecom Office",
+  ],
+  required: function () {
+    return this.role === "Staff" || this.role === "Admin";
+  },
+},
+
+organizationUnit: {
+  type: String,
+  required: function () {
+    return this.role === "Staff" || this.role === "Admin";
+  },
+},
+
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     phoneNumber: {
