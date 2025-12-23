@@ -6,9 +6,9 @@ import { ORGANIZATION_UNITS } from "../constants/organizationUnits.js";
 import {
   sendTicketBookedEmail,
   sendProcessingStartedEmail,
-  sendCompletedEmail,
   sendTurnAlertEmail,
   sendArrivalWindowEmail,
+  sendCompletedEmail,
 } from "../services/emailService.js";
 
 export const requiredDocsList = {
