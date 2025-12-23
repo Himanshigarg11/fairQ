@@ -224,11 +224,15 @@ export const getAllTickets = async (req, res) => {
 
     const filter = {};
 
-    if (req.user.role === "Staff") {
+if (req.user.role === "Staff") {
   filter.organization = req.user.organization;
+  filter.organizationUnit = {
+    $regex: new RegExp(`^${req.user.organizationUnit}$`, "i"),
+  };
 } else {
   if (organization) filter.organization = organization;
 }
+
 
     if (status) filter.status = status;
 
@@ -279,14 +283,18 @@ export const updateTicketStatus = async (req, res) => {
     }
 if (
   req.user.role === "Staff" &&
-  ticket.organization !== req.user.organization
-   
+  (
+    ticket.organization !== req.user.organization ||
+    ticket.organizationUnit.toLowerCase() !==
+      req.user.organizationUnit.toLowerCase()
+  )
 ) {
   return res.status(403).json({
     success: false,
     message: "Unauthorized access",
   });
 }
+
 
 
     const updateData = {
@@ -435,15 +443,30 @@ export const getTicketById = async (req, res) => {
 
     // Check if user has permission to view this ticket
     if (
-      req.user.role === "Customer" &&
-      ticket.customer._id.toString() !== req.user._id.toString()
-    ) {
-      console.log("❌ Access denied for customer:", req.user._id);
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
+  req.user.role === "Customer" &&
+  ticket.customer._id.toString() !== req.user._id.toString()
+) {
+  return res.status(403).json({
+    success: false,
+    message: "Access denied",
+  });
+}
+
+if (
+  req.user.role === "Staff" &&
+  (
+    ticket.organization !== req.user.organization ||
+    ticket.organizationUnit.toLowerCase() !==
+      req.user.organizationUnit.toLowerCase()
+  )
+) {
+  return res.status(403).json({
+    success: false,
+    message: "Unauthorized access",
+  });
+}
+
+
 
     console.log("✅ Ticket found:", ticket.ticketNumber);
 

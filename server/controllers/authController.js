@@ -77,7 +77,10 @@ export const register = async (req, res) => {
       phoneNumber: phoneNumber?.trim() || "",
       role: role || "Customer",
       organization: role === "Staff" ? organization : undefined,
-      organizationUnit: role === "Staff" ? organizationUnit : undefined,
+      organizationUnit: role === "Staff"
+  ? organizationUnit.trim().toLowerCase()
+  : undefined,
+
     });
 
     /* =======================

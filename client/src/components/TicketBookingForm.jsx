@@ -147,35 +147,44 @@ if (name === "organization") {
     setSuccess("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    try {
-      const response = await bookTicket(formData);
-      setSuccess(
-        `Ticket booked successfully! Ticket Number: ${response.data.ticket.ticketNumber}`
-      );
-      setFormData({
-  organization: "",
-  organizationUnit: "",
-  serviceType: "",
-  purpose: "",
-  priority: "Normal",
-  isEmergency: false,
-});
+  try {
+    // ✅ NORMALIZE DATA BEFORE SENDING
+    const payload = {
+      ...formData,
+      organization: formData.organization.trim(),
+      organizationUnit: formData.organizationUnit.trim(),
+    };
 
+    const response = await bookTicket(payload);
 
-      if (onTicketBooked) {
-        onTicketBooked(response.data.ticket);
-      }
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
+    setSuccess(
+      `Ticket booked successfully! Ticket Number: ${response.data.ticket.ticketNumber}`
+    );
+
+    setFormData({
+      organization: "",
+      organizationUnit: "",
+      serviceType: "",
+      purpose: "",
+      priority: "Normal",
+      isEmergency: false,
+    });
+
+    if (onTicketBooked) {
+      onTicketBooked(response.data.ticket);
     }
-  };
+  } catch (error) {
+    setError(error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="bg-white/95 rounded-2xl shadow-lg border border-slate-200 p-6 md:p-8 max-w-3xl mx-auto">

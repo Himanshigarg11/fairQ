@@ -33,8 +33,8 @@ const [organizationUnit, setOrganizationUnit] = useState("");
      const payload = {
   ...formData,
   ...(formData.role === "Staff" && {
-    organization,
-    organizationUnit,
+    organization: organization.trim(),
+    organizationUnit: organizationUnit.trim(),
   }),
 };
 

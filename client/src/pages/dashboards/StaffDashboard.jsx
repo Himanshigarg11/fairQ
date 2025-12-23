@@ -40,40 +40,59 @@ const StaffDashboard = () => {
   const [success, setSuccess] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
 
+useEffect(() => {
+  const handleNewTicket = (newTicket) => {
+  if (
+    newTicket.status === filter &&
+    newTicket.organization === user?.organization &&
+    newTicket.organizationUnit === user?.organizationUnit
+  ) {
+    setTickets((prev) => [newTicket, ...prev]);
+  }
+
+  setAllTickets((prev) => {
+    if (prev.some((t) => t._id === newTicket._id)) return prev;
+    return [newTicket, ...prev];
+  });
+};
+
+
+  socket.on("newTicketBooked", handleNewTicket);
+
+  return () => {
+    socket.off("newTicketBooked", handleNewTicket);
+  };
+}, [filter,user]);
+
+
   useEffect(() => {
-    socket.on("newTicketBooked", (newTicket) => {
-      // Only show tickets for this staff's hospital
-      if (
-        newTicket.hospitalName === user?.assignedHospital &&
-        newTicket.status === filter
-      ) {
-        setTickets((prev) => [newTicket, ...prev]);
-      }
+ const handleTicketUpdated = (updatedTicket) => {
+  if (
+    updatedTicket.organization !== user?.organization ||
+    updatedTicket.organizationUnit !== user?.organizationUnit
+  ) {
+    return;
+  }
 
-      // Always update stats list
-      setAllTickets((prev) => [newTicket, ...prev]);
-    });
+  setTickets((prev) =>
+    prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t))
+  );
 
-    return () => {
-      socket.off("newTicketBooked");
-    };
-  }, [filter, user]);
+  setAllTickets((prev) =>
+    prev.map((t) =>
+      t._id === updatedTicket._id ? updatedTicket : t
+    )
+  );
+};
 
-  useEffect(() => {
-    socket.on("staffTicketUpdated", (updatedTicket) => {
-      setTickets((prev) =>
-        prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t))
-      );
 
-      setAllTickets((prev) =>
-        prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t))
-      );
-    });
+  socket.on("staffTicketUpdated", handleTicketUpdated);
 
-    return () => {
-      socket.off("staffTicketUpdated");
-    };
-  }, []);
+  return () => {
+    socket.off("staffTicketUpdated", handleTicketUpdated);
+  };
+}, [user]);
+
 
   // Live clock
   useEffect(() => {
@@ -83,17 +102,25 @@ const StaffDashboard = () => {
 
   // Load tickets by status
   const fetchTickets = useCallback(async () => {
-    if (!user?.assignedHospital) return;
+    if (!user?.organization || !user?.organizationUnit) return;
 
     try {
       setLoading(true);
-      const res = await getAllTickets({
-        status: filter,
-        organization: user.assignedHospital,
-      });
+     const res = await getAllTickets({
+  status: filter,
+  organization: user.organization,
+  organizationUnit: user.organizationUnit,
+});
+
 
       setTickets(res.data.tickets || []);
-      setAllTickets(res.data.tickets || []);
+
+setAllTickets((prev) => {
+  const map = new Map(prev.map((t) => [t._id, t]));
+  (res.data.tickets || []).forEach((t) => map.set(t._id, t));
+  return Array.from(map.values());
+});
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -207,10 +234,11 @@ const StaffDashboard = () => {
                   Staff Dashboard
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">
-                  Managing Hospital:{" "}
-                  <span className="font-medium text-slate-700">
-                    {user?.assignedHospital || "Not Assigned"}
-                  </span>
+                 Managing {user?.organization || "Not Assigned"}:{" "}
+<span className="font-medium text-slate-700">
+  {user?.organizationUnit || "Not Assigned"}
+</span>
+
                 </p>
 
                 <p className="text-sm text-slate-600">
