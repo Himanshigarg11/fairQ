@@ -1,22 +1,22 @@
-import { Resend } from "resend";
+import sgMail from "@sendgrid/mail";
 
-if (!process.env.RESEND_API_KEY) {
-  console.error("❌ RESEND_API_KEY missing");
+if (!process.env.SENDGRID_API_KEY) {
+  console.error("❌ SENDGRID_API_KEY missing");
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 export const sendEmail = async ({ to, subject, html }) => {
   try {
-    await resend.emails.send({
-      from: "FairQ <onboarding@resend.dev>", // ✅ REQUIRED
+    await sgMail.send({
       to,
+      from: "manshugarg1115@gmail.com", // ✅ Verified Single Sender
       subject,
       html,
     });
 
     console.log(`📧 Email sent to ${to}`);
   } catch (error) {
-    console.error("❌ Resend email failed:", error);
+    console.error("❌ SendGrid email failed:", error.response?.body || error);
   }
 };
