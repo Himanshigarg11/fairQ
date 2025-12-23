@@ -57,3 +57,22 @@ export const sendArrivalWindowEmail = async (ticket, user) => {
     `,
   });
 };
+
+export const sendTurnAlertEmail = async (
+  ticket,
+  user,
+  currentTicketNumber
+) => {
+  await sendEmail({
+    to: user.email,
+    subject: "🔔 Your Turn Is Coming Soon!",
+    html: `
+      <h2>Almost Your Turn ⏰</h2>
+      <p><strong>Current Ticket Being Served:</strong> ${currentTicketNumber}</p>
+      <p><strong>Your Ticket:</strong> ${ticket.ticketNumber}</p>
+      <p><strong>People Before You:</strong> ${ticket.queuePosition - 1}</p>
+      <p><strong>Estimated Wait:</strong> ${ticket.estimatedWaitTime} mins</p>
+      <p>Please be ready.</p>
+    `,
+  });
+};
