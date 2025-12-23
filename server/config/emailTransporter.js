@@ -1,28 +1,22 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-// 🔴 Fail fast if env vars are missing
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-  console.error("❌ EMAIL_USER or EMAIL_PASS is missing");
+if (!process.env.RESEND_API_KEY) {
+  console.error("❌ RESEND_API_KEY missing");
 }
 
-// ✅ Gmail SMTP (RENDER SAFE)
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,        // ✅ REQUIRED
-  secure: true,     // ✅ MUST be true for port 465
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // Gmail App Password
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// 🔍 Verify connection on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ Email transporter verification failed:", error);
-  } else {
-    console.log("✅ Email transporter is ready");
+export const sendEmail = async ({ to, subject, html }) => {
+  try {
+    await resend.emails.send({
+      from: "FairQ <onboarding@resend.dev>", // ✅ REQUIRED
+      to,
+      subject,
+      html,
+    });
+
+    console.log(`📧 Email sent to ${to}`);
+  } catch (error) {
+    console.error("❌ Resend email failed:", error);
   }
-});
-
-export default transporter;
+};
